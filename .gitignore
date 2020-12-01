@@ -30,3 +30,9 @@
 *.exe
 *.out
 *.app
+
+# resource
+resource/result.txt
+log/*
+build/*
+bin/*
