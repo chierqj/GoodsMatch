@@ -14,7 +14,8 @@ class Judger {
     int sr_score[6] = {0, 40, 30, 20, 10, 0};
     const double hopeScore_weight = 0.6;
     const double diaryScore_weight = 0.4;
-    const int property_num = 6;
+    const int cf_property_num = 5;
+    const int sr_property_num = 4;
 
     void Execute();
 

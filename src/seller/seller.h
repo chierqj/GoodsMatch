@@ -27,11 +27,11 @@ class Seller {
 
    public:
     void Execute();
-    int GetGoods(HashMapItr& result, const pair<string, string>& expect, const string& breed);
-    void EraseGoods(SGoods* goods);
+    int QueryGoods(HashMapItr& result, const vector<pair<string, string>>& expect, const string& breed);
     void debug();
 
-    inline unordered_set<SGoods*>& GetLeftGoods();
+    inline unordered_map<string, unordered_set<SGoods*>>& GetLeftGoods();
+    inline unordered_map<string, int>& GetTolStock();
 
    private:
     Seller() {}
@@ -43,12 +43,14 @@ class Seller {
     void create_hashmap();
 
    private:
-    static Seller* Instance;                   // 单例
-    vector<SGoods*> m_goods;                   // 总货物
-    unordered_set<SGoods*> m_left_goods;       // 剩余货物
-    unordered_map<string, HashMap> m_hashmap;  // 获取hash映射
+    static Seller* Instance;                                     // 单例
+    vector<SGoods*> m_goods;                                     // 总货物
+    unordered_map<string, unordered_set<SGoods*>> m_left_goods;  // 剩余货物[品种]
+    HashMap m_hashmap;                                           // 获取hash映射 [品种|属性|属性值]
+    unordered_map<string, int> m_tol_stock;                      // 总库存 [品种|属性|属性值]
 };
 
-inline unordered_set<SGoods*>& Seller::GetLeftGoods() { return m_left_goods; }
+inline unordered_map<string, unordered_set<SGoods*>>& Seller::GetLeftGoods() { return m_left_goods; }
+inline unordered_map<string, int>& Seller::GetTolStock() { return m_tol_stock; }
 
 #endif /* !SELLER_H_ */

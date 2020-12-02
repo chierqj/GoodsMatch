@@ -28,13 +28,13 @@ class Record {
     inline const string &GetIntent() const { return m_intent; }
 
    private:
-    string m_buyer_id;   // 买方客户
-    string m_seller_id;  // 卖方客户
-    string m_breed;      // 品种
-    string m_good_id;    // 货物编号
-    string m_depot_id;   // 仓库
-    int m_good_stock;    // 分配货物数量
-    string m_intent;     // 对应意向顺序 [0 or 1-2-3]
+    string m_buyer_id;
+    string m_seller_id;
+    string m_breed;
+    string m_good_id;
+    string m_depot_id;
+    int m_good_stock;
+    string m_intent;
 };
 
 #endif

@@ -2,27 +2,50 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
+#include <cstring>
 #include <fstream>
 #include <map>
-#include <unordered_map>
+#include <set>
 
 #include "src/comm/config.h"
+#include "src/comm/debug.h"
 #include "src/comm/log.h"
 #include "src/comm/scope_time.h"
 #include "src/comm/tools.h"
 #include "src/seller/seller.h"
 
+Buyer* Buyer::Instance = nullptr;
+Buyer* Buyer::GetInstance() {
+    if (Instance == nullptr) {
+        Instance = new Buyer();
+    }
+    return Instance;
+}
+
 void Buyer::Execute() {
     log_info("----------------------------------------------");
     log_info("* Buyer 开始运行");
+    ScopeTime t;
 
-    this->read_data();
-    this->assign_goods();
-    this->output();
-    this->debug();
+    this->read_data();  // 加载数据
+    log_info("* 加载数据: %.3fs", t.LogTime());
+
+    this->pretreat();  // 预处理
+    log_info("* 预处理: %.3fs", t.LogTime());
+
+    this->assign_goods();  // 分配货物
+    log_info("* 分配货物: %.3fs", t.LogTime());
+
+    this->contact_result();  // 合并结果
+    log_info("* 合并结果: %.3fs", t.LogTime());
+
+    this->output();  // 输出结果
+    log_info("* 输出结果: %.3fs", t.LogTime());
+
+    this->debug();  // 打印输出
 
     log_info("----------------------------------------------");
-    return;
 }
 
 void Buyer::debug() {
@@ -37,7 +60,7 @@ void Buyer::debug() {
 
     unordered_map<string, int> count_depot;
     for (auto& it : m_results) {
-        count_depot[it.buyer_id + "|" + it.breed + "|" + it.depot_id]++;
+        count_depot[it.buyer->GetBuyerID() + "|" + it.buyer->GetBreed() + "|" + it.seller->GetDepotID()]++;
     }
 
     map<int, int> count;
@@ -71,8 +94,6 @@ void Buyer::output() {
 }
 
 void Buyer::read_data() {
-    ScopeTime t;
-
     auto file_path = Config::g_conf["buyer_file"];
     ifstream fin(file_path);
     string line;
@@ -94,62 +115,97 @@ void Buyer::read_data() {
 
         auto good = new BGoods(row_data[0], atoi(row_data[1].c_str()), atoi(row_data[2].c_str()), row_data[3], excepts);
         m_goods.push_back(good);
+        auto k = good->GetBuyerID() + "|" + good->GetBreed();
+        m_hash_goods[k] = good;
     }
     fin.close();
-
-    log_info("* [load %s] [line: %d] [%.3fs]", file_path.c_str(), m_goods.size(), t.LogTime());
 }
 
-void Buyer::do_assign(SGoods* seller, BGoods* buyer, int except_id) {
-    if (seller->GetGoodStock() <= 0) {
-        return;
+void Buyer::contact_result() {
+    unordered_map<string, vector<Business>> mp_result;
+    int max_count = 0;
+
+    for (auto& it : m_results) {
+        string k = it.buyer->GetBuyerID() + "|" + it.seller->GetSellerID() + "|" + it.buyer->GetBreed() + "|" +
+                   it.seller->GetGoodID();
+        mp_result[k].push_back(it);
+        max_count = max(max_count, (int)mp_result[k].size());
     }
-    int val = min(seller->GetGoodStock(), buyer->GetBuyCount());
-    seller->SetGoodStock(seller->GetGoodStock() - val);
-    buyer->SetBuyCount(buyer->GetBuyCount() - val);
 
-    Business bus(buyer->GetBuyerID(), seller->GetSellerID(), seller->GetBreed(), seller->GetGoodID(),
-                 seller->GetDepotID(), val, {except_id});
+    m_results.clear();
+    for (auto& [k, v] : mp_result) {
+        Business bus = v.front();
+        for (int i = 1; i < v.size(); ++i) {
+            bus.assign_count += v[i].assign_count;
+        }
+        m_results.push_back(bus);
+    }
 
-    m_results.push_back(bus);
+    for (auto& it : m_results) {
+        unordered_map<string, string> ump;
+        ump["仓库"] = it.seller->GetDepotID();
+        ump["品牌"] = it.seller->GetBrand();
+        ump["产地"] = it.seller->GetPlace();
+        ump["年度"] = it.seller->GetYear();
+        ump["等级"] = it.seller->GetLevel();
+        ump["类别"] = it.seller->GetCategory();
+        it.expect_order.clear();
+        for (int i = 0; i < it.buyer->GetExcepts().size(); ++i) {
+            const auto& expect = it.buyer->GetExcepts()[i];
+            if (expect.first.empty()) continue;
+            if (ump[expect.first] == expect.second) {
+                it.expect_order.push_back(i + 1);
+            }
+        }
+    }
 }
 
-void Buyer::assign_goods() {
-    sort(m_goods.begin(), m_goods.end(), [&](const BGoods* g1, const BGoods* g2) {
-        if (g1->GetBreed() != g2->GetBreed()) {
-            return g1->GetBreed() > g2->GetBreed();
+void Buyer::pretreat() {
+    int max_count = 0;
+    for (auto& goods : m_goods) {
+        if (goods->GetExcepts()[0].first.empty()) {
+            m_buyers.push_back(goods);
+            continue;
         }
-        if (g1->GetExcepts()[0] == g2->GetExcepts()[0]) {
-            return g1->GetHoldTime() > g2->GetHoldTime();
-        }
-        return g1->GetExcepts()[0] > g2->GetExcepts()[0];
-    });
+        string k = goods->GetBreed() + "|" + goods->GetExcepts()[0].first + "|" + goods->GetExcepts()[0].second;
+        m_blocks[k].push_back(goods);
+        max_count = max(max_count, (int)m_blocks[k].size());
+    }
 
+    int tol_count = 0;
     auto Seller = Seller::GetInstance();
-    auto left_sellers = Seller->GetLeftGoods();
 
-    for (auto& buyer : m_goods) {
-        // 先按照意向分配
-        for (int except_id = 0; except_id < 5 && buyer->GetBuyCount() > 0; ++except_id) {
-            HashMapItr result;
-            int iRet = Seller->GetGoods(result, buyer->GetExcepts()[except_id], buyer->GetBreed());
-            if (iRet != 0) continue;
-            while (!result->second.empty() && buyer->GetBuyCount() > 0) {
-                auto seller = result->second.front();
-                this->do_assign(seller, buyer, except_id + 1);
-                if (seller->GetGoodStock() <= 0) {  // 库存为0，需要删除
-                    result->second.pop_front();
-                    left_sellers.erase(seller);
-                }
+    for (auto& [k, buyers] : m_blocks) {
+        sort(buyers.begin(), buyers.end(), [&](const BGoods* g1, const BGoods* g2) {
+            if (g1->GetHoldTime() == g2->GetHoldTime()) {
+                return g1->GetBuyCount() > g2->GetBuyCount();
             }
-        }
-        // 没分完，随便分
-        while (!left_sellers.empty() && buyer->GetBuyCount() > 0) {
-            auto seller = *left_sellers.begin();
-            this->do_assign(seller, buyer, 0);
-            if (seller->GetGoodStock() <= 0) {  // 库存为0，需要删除
-                left_sellers.erase(seller);
+            return g1->GetHoldTime() > g2->GetHoldTime();
+        });
+
+        auto buyer = buyers.front();
+        vector<int> seller_count;
+
+        int sum_count = 0;
+        for (int i = 0; i < buyer->GetExcepts().size(); ++i) {
+            const auto& excepct = buyer->GetExcepts()[i];
+            HashMapItr tmp;
+            int iRet = Seller->QueryGoods(tmp, {excepct}, buyer->GetBreed());
+            if (iRet != 0) {
+                seller_count.push_back(0);
+                continue;
             }
+            seller_count.push_back(tmp->second.size());
+            sum_count += tmp->second.size();
         }
+
+        log_debug("* [%s] [买: %d, 卖: (%d,%d,%d,%d,%d)]", k.c_str(), buyers.size(), seller_count[0], seller_count[1],
+                  seller_count[2], seller_count[3], seller_count[4]);
+
+        tol_count += buyers.size();
     }
+
+    log_debug("* max_buy_count: %d", max_count);
+    log_debug("* buyer.size(): %d", m_buyers.size());
+    log_debug("* tol_count: %d", tol_count + m_buyers.size());
 }

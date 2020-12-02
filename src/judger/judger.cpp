@@ -21,11 +21,11 @@ void Judger::Execute() {
     this->CheckIntent();
 
     auto score = GetScore();
-    log_info("[Score: %.3f]", score);
+    log_info("* 得分: %.3f ", score);
 }
 
 void Judger::CheckStock() {
-    log_info("* CheckStock...");
+    log_info(" CheckStock...");
 
     //货物总数量检查
     unordered_map<string, int> hashMap;
@@ -37,7 +37,7 @@ void Judger::CheckStock() {
     }
     for (auto &item : hashMap) {
         if (item.second != 0) {
-            log_error("* 货物%s总数量不匹配 ", item.first.c_str());
+            log_error(" 货物%s总数量不匹配 ", item.first.c_str());
             exit(1);
         }
     }
@@ -53,16 +53,32 @@ void Judger::CheckStock() {
     }
     for (auto &item : hashMap) {
         if (item.second != 0) {
-            log_error("* 卖方货物%s总数量不匹配 ", item.first.c_str());
+            log_error(" 卖方货物%s总数量不匹配 ", item.first.c_str());
             exit(1);
         }
     }
 
-    log_info("* CheckStock done.");
+    //卖方仓库数量检查
+    hashMap.clear();
+    for (auto &item : m_sgoods) {
+        hashMap[item->GetSellerID() + item->GetBreed() + item->GetDepotID()] += item->GetGoodStock();
+    }
+    for (auto &item : m_records) {
+        auto &good_stock = hashMap[item->GetSellerID() + item->GetBreed() + item->GetDepotID()];
+        good_stock -= item->GetGoodStock();
+    }
+    for (auto &item : hashMap) {
+        if (item.second != 0) {
+            log_error(" 卖方品种仓库%s总数量不匹配 ", item.first.c_str());
+            exit(1);
+        }
+    }
+
+    log_info(" CheckStock done.");
 }
 
 void Judger::CheckExist() {
-    log_info("* CheckExist...");
+    log_info(" CheckExist...");
 
     //检查买方id存在
     unordered_set<string> hashSet;
@@ -71,7 +87,7 @@ void Judger::CheckExist() {
     }
     for (auto &item : m_records) {
         if (hashSet.find(item->GetBuyerId()) == hashSet.end()) {
-            log_error("* buyer_id %s is not exist.", item->GetBuyerId().c_str());
+            log_error(" buyer_id %s is not exist.", item->GetBuyerId().c_str());
             exit(1);
         }
     }
@@ -83,7 +99,7 @@ void Judger::CheckExist() {
     }
     for (auto &item : m_records) {
         if (hashSet.find(item->GetSellerID()) == hashSet.end()) {
-            log_error("* seller_id %s is not exist.", item->GetSellerID().c_str());
+            log_error(" seller_id %s is not exist.", item->GetSellerID().c_str());
             exit(1);
         }
     }
@@ -95,7 +111,7 @@ void Judger::CheckExist() {
     }
     for (auto &item : m_records) {
         if (hashSet.find(item->GetBreed()) == hashSet.end()) {
-            log_error("* breed %s is not exist.", item->GetBreed().c_str());
+            log_error(" breed %s is not exist.", item->GetBreed().c_str());
             exit(1);
         }
     }
@@ -107,7 +123,7 @@ void Judger::CheckExist() {
     }
     for (auto &item : m_records) {
         if (hashSet.find(item->GetGoodID()) == hashSet.end()) {
-            log_error("* good_id %s is not exist.", item->GetGoodID().c_str());
+            log_error(" good_id %s is not exist.", item->GetGoodID().c_str());
             exit(1);
         }
     }
@@ -119,16 +135,16 @@ void Judger::CheckExist() {
     }
     for (auto &item : m_records) {
         if (hashSet.find(item->GetDepotID()) == hashSet.end()) {
-            log_error("* good_id %s is not exist.", item->GetDepotID().c_str());
+            log_error(" good_id %s is not exist.", item->GetDepotID().c_str());
             exit(1);
         }
     }
 
-    log_info("* CheckExist done.");
+    log_info(" CheckExist done.");
 }
 
 void Judger::CheckIntent() {
-    log_info("* CheckIntent...");
+    log_info(" CheckIntent...");
 
     //意向合法检查
     {
@@ -147,7 +163,7 @@ void Judger::CheckIntent() {
             int maxNum = buyer_intent_nums[item->GetBuyerId() + item->GetBreed()];
             for (auto &elem : nums) {
                 if (atoi(elem.c_str()) > maxNum) {
-                    log_error("* 第%d个答案对应意向顺序%s不合法", index, intent.c_str());
+                    log_error("第%d个答案对应意向顺序%s不合法", index, intent.c_str());
                     exit(0);
                 }
             }
@@ -186,14 +202,14 @@ void Judger::CheckIntent() {
                 if (vt[index]->GetHoldTime() < flag->GetHoldTime() &&
                     first_intent_records.find(vt[index]->GetBuyerID() + vt[index]->GetBreed()) !=
                         first_intent_records.end()) {
-                    log_error("* 第一意向违规 ");
+                    log_error(" 第一意向违规 ");
                     exit(1);
                 }
             }
         }
     }
 
-    log_info("* CheckIntent done.");
+    log_info(" CheckIntent done.");
 }
 
 void Judger::ReadBuyerData() {
@@ -278,14 +294,16 @@ void Judger::read_data() {
 }
 
 double Judger::GetScore() {
-    unordered_map<string, int> buyer_good_nums;
+    unordered_map<string, int> buyerBreed_stock;  //客户在某个品种买入的货物数量
     for (auto &item : m_records) {
-        buyer_good_nums[item->GetBuyerId() + item->GetBreed()] += item->GetGoodStock();
+        buyerBreed_stock[item->GetBuyerId() + item->GetBreed()] += item->GetGoodStock();
     }
 
-    unordered_map<string, double> buyer_score;
+    unordered_map<string, double>
+        buyerBreed_score;  //客户在某个品种的满意率评分  满意率评分由hope_score和dairy_score构成
+    //统计hope_score
     for (auto &item : m_records) {
-        int allNum = buyer_good_nums[item->GetBuyerId() + item->GetBreed()];
+        int allNum = buyerBreed_stock[item->GetBuyerId() + item->GetBreed()];
         int curNum = item->GetGoodStock();
         auto intents = item->GetIntent();
         auto intentID = Tools::Split(intents, "-");
@@ -302,12 +320,17 @@ double Judger::GetScore() {
         } else {
             log_error(" %s品种不存在 ", item->GetBreed().c_str());
         }
-        buyer_score[item->GetBuyerId() + item->GetBreed()] += ((double)curNum / allNum) * score;
+        if (score > 100) {
+            log_error(" 意向分超过100 ");
+            item->debug();
+            exit(0);
+        }
+        buyerBreed_score[item->GetBuyerId() + item->GetBreed()] += ((double)curNum / allNum) * score;
     }
-    for (auto &item : buyer_score) {
+    for (auto &item : buyerBreed_score) {
         item.second = item.second * hopeScore_weight;
     }
-
+    //统计diary_score
     unordered_map<string, unordered_set<string>> buyerBreed_depotID;
     for (auto &item : m_records) {
         buyerBreed_depotID[item->GetBuyerId() + item->GetBreed()].insert(item->GetDepotID());
@@ -315,11 +338,21 @@ double Judger::GetScore() {
     for (auto &item : buyerBreed_depotID) {
         double diary_score = 100;
         int depotCounts = item.second.size();
-        diary_score = diary_score - ((double)100 / property_num) * (depotCounts - 1);
+        if (item.first.back() == 'F')
+            diary_score = diary_score - ((double)100 / cf_property_num) * (depotCounts - 1);
+        else if (item.first.back() == 'R')
+            diary_score = diary_score - ((double)100 / sr_property_num) * (depotCounts - 1);
+        else
+            log_error(" 品种%s不存在 ", item.first.c_str());
+        if (diary_score > 100) {
+            log_error(" 记录分超过100 ");
+            exit(0);
+        }
         diary_score = diary_score * diaryScore_weight;
-        buyer_score[item.first] += diary_score;
+        buyerBreed_score[item.first] += diary_score;
     }
 
+    //统计两个品种货物总数
     int cf_allStocks = 0, sr_allStocks = 0;
     for (auto &item : m_records) {
         if (item->GetBreed() == "CF") {
@@ -331,18 +364,21 @@ double Judger::GetScore() {
         }
     }
 
-    double cf_allScore = 0, sr_allScore;
-    for (auto &item : buyer_score) {
+    //计算两个品种的总分
+    double cf_allScore = 0, sr_allScore = 0;
+    for (auto &item : buyerBreed_score) {
         auto buyerId_breed = item.first;
         auto customer_score = item.second;
         if (buyerId_breed.back() == 'F') {
-            cf_allStocks += ((double)buyer_good_nums[buyerId_breed] / cf_allStocks) * customer_score;
+            double score = ((double)buyerBreed_stock[buyerId_breed] / cf_allStocks) * customer_score;
+            cf_allScore += score;
         } else if (buyerId_breed.back() == 'R') {
-            sr_allStocks += ((double)buyer_good_nums[buyerId_breed] / sr_allStocks) * customer_score;
+            double score = ((double)buyerBreed_stock[buyerId_breed] / sr_allStocks) * customer_score;
+            sr_allScore += score;
         } else {
             log_error(" %s品种不存在 ", buyerId_breed.c_str());
         }
     }
 
-    return cf_allStocks + sr_allStocks;
+    return cf_allScore + sr_allScore;
 }

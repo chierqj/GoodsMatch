@@ -26,6 +26,7 @@ class BGoods {
     inline const string& GetBreed() const;
     inline const vector<pair<string, string>>& GetExcepts() const;
     inline void SetBuyCount(int buy_count);
+    void GetPermutation(vector<vector<pair<string, string>>>& res_expects, vector<vector<int>>& expect_order);
 
    private:
     string m_buyer_id;                       // 买家id

@@ -1,0 +1,26 @@
+{
+    "files.associations": {
+        "*.py": "python",
+        "unistd.h": "c",
+        "string.h": "c",
+        "stdlib.h": "c",
+        "*.tex": "latex",
+        "*.toml": "go",
+        "__undef_macros": "cpp",
+        "memory_resource": "cpp",
+        "vector": "cpp",
+        "string": "cpp",
+        "unordered_map": "cpp",
+        "deque": "cpp",
+        "utility": "cpp",
+        "typeinfo": "cpp",
+        "iosfwd": "cpp",
+        "fstream": "cpp",
+        "functional": "cpp",
+        "memory": "cpp",
+        "queue": "cpp",
+        "__split_buffer": "cpp",
+        "array": "cpp",
+        "string_view": "cpp"
+    }
+}
