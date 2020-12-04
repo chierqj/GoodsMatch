@@ -158,9 +158,10 @@ void Buyer::pretreat() {
             m_buyers_no_expects.push_back(buyer);
             continue;
         }
-        string key = buyer->GetBreed() + "|" + first_expect.first + "|" + first_expect.second;
-        m_buyers_groupby_expect[key].push_back(buyer);
+        m_buyers_groupby_expect[buyer->GetFirstIntent()].push_back(buyer);
     }
+
+    auto& global_count = Seller::GetInstance()->GetGlobalCount();
 
     // sort by hold_time
     int max_expext_buyers = 0;

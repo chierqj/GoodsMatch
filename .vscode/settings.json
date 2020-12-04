@@ -39,6 +39,7 @@
         "chrono": "cpp",
         "__locale": "cpp",
         "system_error": "cpp",
-        "new": "cpp"
+        "new": "cpp",
+        "random": "cpp"
     }
 }

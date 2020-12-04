@@ -328,14 +328,17 @@ double Judger::GetScore() {
         }
         buyerBreed_score[item->GetBuyerId() + item->GetBreed()] += ((double)curNum / allNum) * score;
     }
+    unordered_map<string, double> buyerBreed_hopeScore;
     for (auto &item : buyerBreed_score) {
         item.second = item.second * hopeScore_weight;
+        buyerBreed_hopeScore[item.first] = item.second;
     }
     //统计diary_score
     unordered_map<string, unordered_set<string>> buyerBreed_depotID;
     for (auto &item : m_records) {
         buyerBreed_depotID[item->GetBuyerId() + item->GetBreed()].insert(item->GetDepotID());
     }
+    unordered_map<string, double> buyerBreed_diaryScore;
     for (auto &item : buyerBreed_depotID) {
         double diary_score = 100;
         int depotCounts = item.second.size();
@@ -350,6 +353,7 @@ double Judger::GetScore() {
             exit(0);
         }
         diary_score = diary_score * diaryScore_weight;
+        buyerBreed_diaryScore[item.first] = diary_score;
         buyerBreed_score[item.first] += diary_score;
     }
 
@@ -367,14 +371,23 @@ double Judger::GetScore() {
 
     //计算两个品种的总分
     double cf_allScore = 0, sr_allScore = 0;
+    double cf_hopeScore = 0, sr_hopeScore = 0, cf_diaryScore = 0, sr_diaryScore = 0;
     for (auto &item : buyerBreed_score) {
         auto buyerId_breed = item.first;
         auto customer_score = item.second;
         if (buyerId_breed.back() == 'F') {
             double score = ((double)buyerBreed_stock[buyerId_breed] / cf_allStocks) * customer_score;
+            cf_hopeScore +=
+                ((double)buyerBreed_stock[buyerId_breed] / cf_allStocks) * buyerBreed_hopeScore[buyerId_breed];
+            cf_diaryScore +=
+                ((double)buyerBreed_stock[buyerId_breed] / cf_allStocks) * buyerBreed_diaryScore[buyerId_breed];
             cf_allScore += score;
         } else if (buyerId_breed.back() == 'R') {
             double score = ((double)buyerBreed_stock[buyerId_breed] / sr_allStocks) * customer_score;
+            sr_hopeScore +=
+                ((double)buyerBreed_stock[buyerId_breed] / sr_allStocks) * buyerBreed_hopeScore[buyerId_breed];
+            sr_diaryScore +=
+                ((double)buyerBreed_stock[buyerId_breed] / sr_allStocks) * buyerBreed_diaryScore[buyerId_breed];
             sr_allScore += score;
         } else {
             log_error(" %s品种不存在 ", buyerId_breed.c_str());
@@ -389,6 +402,11 @@ double Judger::GetScore() {
     for (auto &item : depotCount_buyerCount) {
         log_debug("* 仓库个数: %d, 客户数: %d ", item.first, item.second);
     }
+
+    log_debug("* [CF] --- [hope_score: %f, diary_score: %f]", cf_hopeScore, cf_diaryScore);
+    log_debug("* [SR] --- [hope_score: %f, diary_score: %f]", sr_hopeScore, sr_diaryScore);
+    log_debug("* [ALL]--- [hope_score: %f, diary_score: %f]", cf_hopeScore + sr_hopeScore,
+              cf_diaryScore + sr_diaryScore);
 
     return cf_allScore + sr_allScore;
 }

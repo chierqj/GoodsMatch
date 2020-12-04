@@ -26,6 +26,11 @@ void BGoods::create_permutation() {
     bool sign = true;
     m_useful_intent = 0;
 
+    m_first_intent = "";
+    if (!m_intent[0].first.empty()) {
+        m_first_intent = m_breed + "|" + m_intent[0].first + "|" + m_intent[0].second;
+    }
+
     // 一个一个
     for (int i = 0; i < sz; ++i) {
         const auto& expect = m_intent[i];

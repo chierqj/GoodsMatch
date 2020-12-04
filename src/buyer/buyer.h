@@ -36,9 +36,13 @@ class Buyer {
     void contact_result();
     void pretreat();
 
-    void do_assign_step1(vector<BGoods *> &left_buyers);
-    void do_assign_step2(vector<BGoods *> &left_buyers);
-    void do_assign_step3(vector<BGoods *> &left_buyers);
+    BGoods *get_best_buyer();
+    void assign_buyer(BGoods *buyer, bool consider_first_intent);
+    void assign_step1();
+    void assign_step2();
+    void assign_step3();
+
+    void debug_depot(string msg);
 
    private:
     static Buyer *Instance;                                          // 单例
@@ -46,6 +50,7 @@ class Buyer {
     unordered_map<string, deque<BGoods *>> m_buyers_groupby_expect;  // groupby_expect
     vector<Business> m_results;                                      // 成交
     vector<BGoods *> m_buyers_no_expects;                            // no_expects
+    deque<BGoods *> m_left_buyers;                                   // 剩余未分配
 };
 
 #endif /* !BUYER_H_ */

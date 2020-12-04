@@ -83,88 +83,11 @@ void Seller::create_hashmap() {
             string key = propoty->map_key;
             depot->sellers_groupby_except[key].push_back(seller);
             depot->sellers_tol_stock[key] += seller->GetGoodStock();
-
-            if (propoty->values.size() == 1) {
-                m_global_count[propoty->map_key] += seller->GetGoodStock();
-            }
+            m_global_count[propoty->map_key] += seller->GetGoodStock();
         }
 
         depot->useful_sellers[seller->GetBreed()].insert(seller);
     }
-
-    // for (auto& [depot_id, depot] : m_sellers_groupby_depot) {
-    //     for (auto& [intent, sellers] : depot->sellers_groupby_except) {
-    //         auto vct = Tools::Split(intent, "|");
-    //         unordered_set<string> vis;
-
-    //         for (int i = 0; i < vct.size(); i += 2) {
-    //             string key = vct[i] + "|" + vct[i + 1];
-    //             vis.insert(key);
-    //         }
-
-    //         sort(sellers.begin(), sellers.end(), [&](const SGoods* g1, const SGoods* g2) {
-    //             int count1 = 0, count2 = 0;
-    //             int min_value1 = INT_MAX, min_value2 = INT_MAX;
-
-    //             {
-    //                 unordered_map<string, string> ump;
-    //                 const auto& depot_id = g1->GetDepotID();
-    //                 const auto& brand = g1->GetBrand();
-    //                 const auto& place = g1->GetPlace();
-    //                 const auto& year = g1->GetYear();
-    //                 const auto& level = g1->GetLevel();
-    //                 const auto& category = g1->GetCategory();
-
-    //                 if (!depot_id.empty()) ump["仓库"] = depot_id;
-    //                 if (!brand.empty()) ump["品牌"] = brand;
-    //                 if (!place.empty()) ump["产地"] = place;
-    //                 if (!year.empty()) ump["年度"] = year;
-    //                 if (!level.empty()) ump["等级"] = level;
-    //                 if (!category.empty()) ump["类别"] = category;
-
-    //                 for (auto& name : names) {
-    //                     string key = name + "|" + ump[name];
-    //                     if (vis.find(key) == vis.end()) {
-    //                         ++count1;
-    //                         min_value1 = min(min_value1, m_global_count[key]);
-    //                     }
-    //                 }
-    //             }
-
-    //             {
-    //                 unordered_map<string, string> ump;
-    //                 const auto& depot_id = g2->GetDepotID();
-    //                 const auto& brand = g2->GetBrand();
-    //                 const auto& place = g2->GetPlace();
-    //                 const auto& year = g2->GetYear();
-    //                 const auto& level = g2->GetLevel();
-    //                 const auto& category = g2->GetCategory();
-
-    //                 if (!depot_id.empty()) ump["仓库"] = depot_id;
-    //                 if (!brand.empty()) ump["品牌"] = brand;
-    //                 if (!place.empty()) ump["产地"] = place;
-    //                 if (!year.empty()) ump["年度"] = year;
-    //                 if (!level.empty()) ump["等级"] = level;
-    //                 if (!category.empty()) ump["类别"] = category;
-
-    //                 for (auto& name : names) {
-    //                     string key = name + "|" + ump[name];
-    //                     if (vis.find(key) == vis.end()) {
-    //                         ++count2;
-    //                         min_value2 = min(min_value2, m_global_count[key]);
-    //                     }
-    //                 }
-    //             }
-
-    //             if (count1 == count2) return min_value1 > min_value2;
-    //             return count1 < count2;
-    //         });
-
-    //         for (int i = 0; i < min(10, (int)sellers.size()); ++i) {
-    //             sellers[i]->debug();
-    //         }
-    //     }
-    // }
 
     log_info("* [create hashmap] [%.3fs]", t.LogTime());
 }

@@ -20,19 +20,14 @@
 #include "src/buyer/bgoods.h"
 using namespace std;
 
+class Seller;
+
 struct Depot {
     Depot(const string& depot_id) : depot_id(depot_id) {}
-    void decrease_stock(const SGoods* seller, int val) {
-        for (auto& propoty : seller->GetPropoty()) {
-            string key = seller->GetBreed() + "|" + propoty->map_key;
-            sellers_tol_stock[key] -= val;
-            assert(sellers_tol_stock[key] >= 0);
-        }
-    }
 
     void decrease_stock(const SGoods* seller, int val, unordered_map<string, int>& ump) {
         for (auto& propoty : seller->GetPropoty()) {
-            string key = seller->GetBreed() + "|" + propoty->map_key;
+            string key = propoty->map_key;
             sellers_tol_stock[key] -= val;
             ump[key] -= val;
         }

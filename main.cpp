@@ -22,3 +22,8 @@ int main(int argc, char **argv) {
     fclose(fp);
     return 0;
 }
+
+/*
+仓库,品牌,产地,年度,等级,类别
+A,B,C,D,E,F
+*/
