@@ -28,23 +28,14 @@ void Buyer::Execute() {
     log_info("* Buyer 开始运行");
     ScopeTime t;
 
-    this->read_data();  // 加载数据
-    log_info("* 加载数据: %.3fs", t.LogTime());
-
-    this->pretreat();  // 预处理
-    log_info("* 预处理: %.3fs", t.LogTime());
-
-    this->assign_goods();  // 分配货物
-    log_info("* 分配货物: %.3fs", t.LogTime());
-
+    this->read_data();       // 加载数据
+    this->pretreat();        // 预处理
+    this->assign_goods();    // 分配货物
     this->contact_result();  // 合并结果
-    log_info("* 合并结果: %.3fs", t.LogTime());
+    this->output();          // 输出结果
+    this->debug();           // 打印输出
 
-    this->output();  // 输出结果
-    log_info("* 输出结果: %.3fs", t.LogTime());
-
-    this->debug();  // 打印输出
-
+    log_info("* Buyer::Execute(): %.3fs", t.LogTime());
     log_info("----------------------------------------------");
 }
 
@@ -57,23 +48,6 @@ void Buyer::debug() {
             ++ok;
         }
     }
-
-    unordered_map<string, int> count_depot;
-    for (auto& it : m_results) {
-        count_depot[it.buyer->GetBuyerID() + "|" + it.buyer->GetBreed() + "|" + it.seller->GetDepotID()]++;
-    }
-
-    map<int, int> count;
-    for (auto& [k, v] : count_depot) {
-        count[v]++;
-    }
-
-    int tol = 0;
-    for (auto& [k, v] : count) {
-        log_info("* 仓库个数: %d, 成交条数: %d", k, v);
-        tol += k * v;
-    }
-    log_info("* tol: %d", tol);
 
     log_info("----------------------------------------------");
     log_info("* 货物总数: %d", m_goods.size());
@@ -94,6 +68,10 @@ void Buyer::output() {
 }
 
 void Buyer::read_data() {
+    log_info("----------------------------------------------");
+    log_info("* 读文件");
+    ScopeTime t;
+
     auto file_path = Config::g_conf["buyer_file"];
     ifstream fin(file_path);
     string line;
@@ -114,14 +92,20 @@ void Buyer::read_data() {
                                              {row_data[12], row_data[13]}};
 
         auto good = new BGoods(row_data[0], atoi(row_data[1].c_str()), atoi(row_data[2].c_str()), row_data[3], excepts);
+        good->create_permutation();
         m_goods.push_back(good);
-        auto k = good->GetBuyerID() + "|" + good->GetBreed();
-        m_hash_goods[k] = good;
     }
     fin.close();
+
+    log_info("* [load %s] [line: %d] [%.3fs]", file_path.c_str(), m_goods.size(), t.LogTime());
+    log_info("----------------------------------------------");
 }
 
 void Buyer::contact_result() {
+    log_info("----------------------------------------------");
+    log_info("* 合并答案");
+    ScopeTime t;
+
     unordered_map<string, vector<Business>> mp_result;
     int max_count = 0;
 
@@ -150,62 +134,55 @@ void Buyer::contact_result() {
         ump["等级"] = it.seller->GetLevel();
         ump["类别"] = it.seller->GetCategory();
         it.expect_order.clear();
-        for (int i = 0; i < it.buyer->GetExcepts().size(); ++i) {
-            const auto& expect = it.buyer->GetExcepts()[i];
+        for (int i = 0; i < it.buyer->GetIntents().size(); ++i) {
+            const auto& expect = it.buyer->GetIntents()[i];
             if (expect.first.empty()) continue;
             if (ump[expect.first] == expect.second) {
                 it.expect_order.push_back(i + 1);
             }
         }
     }
+
+    log_info("* [time: %.3fs]", t.LogTime());
+    log_info("----------------------------------------------");
 }
 
 void Buyer::pretreat() {
-    int max_count = 0;
-    for (auto& goods : m_goods) {
-        if (goods->GetExcepts()[0].first.empty()) {
-            m_buyers.push_back(goods);
+    log_info("----------------------------------------------");
+    log_info("* 预处理");
+    ScopeTime t;
+
+    for (const auto& buyer : m_goods) {
+        const auto& first_expect = buyer->GetIntents()[0];
+        if (first_expect.first.empty()) {
+            m_buyers_no_expects.push_back(buyer);
             continue;
         }
-        string k = goods->GetBreed() + "|" + goods->GetExcepts()[0].first + "|" + goods->GetExcepts()[0].second;
-        m_blocks[k].push_back(goods);
-        max_count = max(max_count, (int)m_blocks[k].size());
+        string key = buyer->GetBreed() + "|" + first_expect.first + "|" + first_expect.second;
+        m_buyers_groupby_expect[key].push_back(buyer);
     }
 
-    int tol_count = 0;
-    auto Seller = Seller::GetInstance();
-
-    for (auto& [k, buyers] : m_blocks) {
+    // sort by hold_time
+    int max_expext_buyers = 0;
+    int min_expext_buyers = INT_MAX;
+    int tol_expext_buyers = 0;
+    for (auto& [expect, buyers] : m_buyers_groupby_expect) {
         sort(buyers.begin(), buyers.end(), [&](const BGoods* g1, const BGoods* g2) {
             if (g1->GetHoldTime() == g2->GetHoldTime()) {
                 return g1->GetBuyCount() > g2->GetBuyCount();
             }
             return g1->GetHoldTime() > g2->GetHoldTime();
         });
-
-        auto buyer = buyers.front();
-        vector<int> seller_count;
-
-        int sum_count = 0;
-        for (int i = 0; i < buyer->GetExcepts().size(); ++i) {
-            const auto& excepct = buyer->GetExcepts()[i];
-            HashMapItr tmp;
-            int iRet = Seller->QueryGoods(tmp, {excepct}, buyer->GetBreed());
-            if (iRet != 0) {
-                seller_count.push_back(0);
-                continue;
-            }
-            seller_count.push_back(tmp->second.size());
-            sum_count += tmp->second.size();
-        }
-
-        log_debug("* [%s] [买: %d, 卖: (%d,%d,%d,%d,%d)]", k.c_str(), buyers.size(), seller_count[0], seller_count[1],
-                  seller_count[2], seller_count[3], seller_count[4]);
-
-        tol_count += buyers.size();
+        max_expext_buyers = max(max_expext_buyers, (int)buyers.size());
+        min_expext_buyers = min(min_expext_buyers, (int)buyers.size());
+        tol_expext_buyers += (int)buyers.size();
     }
 
-    log_debug("* max_buy_count: %d", max_count);
-    log_debug("* buyer.size(): %d", m_buyers.size());
-    log_debug("* tol_count: %d", tol_count + m_buyers.size());
+    log_info("* expect_count: %d", m_buyers_groupby_expect.size());
+    log_info("* max_expext_buyers: %d", max_expext_buyers);
+    log_info("* min_expext_buyers: %d", min_expext_buyers);
+    log_info("* tol_expext_buyers: %d", tol_expext_buyers);
+    log_info("* tol_buyers: %d", m_buyers_no_expects.size() + tol_expext_buyers);
+    log_info("* [time: %.3fs]", t.LogTime());
+    log_info("----------------------------------------------");
 }

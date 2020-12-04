@@ -8,6 +8,7 @@
 #ifndef BUYER_H_
 #define BUYER_H_
 
+#include <queue>
 #include <unordered_map>
 #include <vector>
 
@@ -40,12 +41,11 @@ class Buyer {
     void do_assign_step3(vector<BGoods *> &left_buyers);
 
    private:
-    static Buyer *Instance;                            // 单例
-    vector<BGoods *> m_goods;                          // buyers from file
-    unordered_map<string, BGoods *> m_hash_goods;      // k: buyer_id+breed
-    vector<Business> m_results;                        // 成交
-    unordered_map<string, vector<BGoods *>> m_blocks;  // [greed+expect1]
-    vector<BGoods *> m_buyers;                         // buyers for assign
+    static Buyer *Instance;                                          // 单例
+    vector<BGoods *> m_goods;                                        // buyers from file
+    unordered_map<string, deque<BGoods *>> m_buyers_groupby_expect;  // groupby_expect
+    vector<Business> m_results;                                      // 成交
+    vector<BGoods *> m_buyers_no_expects;                            // no_expects
 };
 
 #endif /* !BUYER_H_ */

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <fstream>
+#include <map>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -151,7 +152,7 @@ void Judger::CheckIntent() {
         unordered_map<string, int> buyer_intent_nums;
         for (auto &item : m_bgoods) {
             int num = 0;
-            for (auto &elem : item->GetExcepts()) {
+            for (auto &elem : item->GetIntents()) {
                 if (elem.first != "") num++;
             }
             buyer_intent_nums[item->GetBuyerID() + item->GetBreed()] = num;
@@ -182,8 +183,8 @@ void Judger::CheckIntent() {
 
         unordered_map<string, vector<BGoods *>> intents;  // k: 品种+第一意向值
         for (auto &item : m_bgoods) {
-            if (item->GetExcepts()[0].first.size() < 1) continue;
-            auto first_intent = item->GetBreed() + item->GetExcepts()[0].first + item->GetExcepts()[0].second;
+            if (item->GetIntents()[0].first.size() < 1) continue;
+            auto first_intent = item->GetBreed() + item->GetIntents()[0].first + item->GetIntents()[0].second;
             intents[first_intent].push_back(item);
         }
         for (auto &item : intents) {
@@ -378,6 +379,15 @@ double Judger::GetScore() {
         } else {
             log_error(" %s品种不存在 ", buyerId_breed.c_str());
         }
+    }
+
+    map<int, int> depotCount_buyerCount;
+    for (auto &item : buyerBreed_depotID) {
+        int depotCount = item.second.size();
+        depotCount_buyerCount[depotCount]++;
+    }
+    for (auto &item : depotCount_buyerCount) {
+        log_debug("* 仓库个数: %d, 客户数: %d ", item.first, item.second);
     }
 
     return cf_allScore + sr_allScore;

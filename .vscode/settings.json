@@ -21,6 +21,24 @@
         "queue": "cpp",
         "__split_buffer": "cpp",
         "array": "cpp",
-        "string_view": "cpp"
+        "string_view": "cpp",
+        "__bit_reference": "cpp",
+        "__hash_table": "cpp",
+        "__tree": "cpp",
+        "filesystem": "cpp",
+        "initializer_list": "cpp",
+        "iterator": "cpp",
+        "map": "cpp",
+        "set": "cpp",
+        "unordered_set": "cpp",
+        "__node_handle": "cpp",
+        "stack": "cpp",
+        "cmath": "cpp",
+        "type_traits": "cpp",
+        "algorithm": "cpp",
+        "chrono": "cpp",
+        "__locale": "cpp",
+        "system_error": "cpp",
+        "new": "cpp"
     }
 }
