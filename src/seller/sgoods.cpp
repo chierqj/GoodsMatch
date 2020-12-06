@@ -45,17 +45,17 @@ void SGoods::create_permutation() {
     }
 
     // 五个五个
-    if (sign) {
-        vector<pair<string, string>> vt;
-        bool fir = true;
-        string key = m_breed;
-        for (auto& name : names) {
-            key += "|" + name + "|" + ump[name];
-            vt.push_back({name, ump[name]});
-        }
-        m_propoty.push_back(new Propoty(vt, key));
-        // m_propoty.push_back(new Propoty(key));
-    }
+    // if (sign) {
+    //     vector<pair<string, string>> vt;
+    //     bool fir = true;
+    //     string key = m_breed;
+    //     for (auto& name : names) {
+    //         key += "|" + name + "|" + ump[name];
+    //         vt.push_back({name, ump[name]});
+    //     }
+    //     m_propoty.push_back(new Propoty(vt, key));
+    //     // m_propoty.push_back(new Propoty(key));
+    // }
 
     // 两个两个
     for (int i = 0; i < sz; ++i) {
@@ -116,6 +116,38 @@ void SGoods::create_permutation() {
                     vector<pair<string, string>> vt{{n1, v1}, {n2, v2}, {n3, v3}, {n4, v4}};
                     m_propoty.push_back(new Propoty(vt, key));
                     // m_propoty.push_back(new Propoty(key));
+                }
+            }
+        }
+    }
+
+    // 五个五个
+    for (int i = 0; i < sz; ++i) {
+        const auto& n1 = names[i];
+        if (ump.find(n1) == ump.end()) continue;
+        const auto& v1 = ump[n1];
+        for (int j = i + 1; j < sz; ++j) {
+            const auto& n2 = names[j];
+            if (ump.find(n2) == ump.end()) continue;
+            const auto& v2 = ump[n2];
+            for (int k = j + 1; k < sz; ++k) {
+                const auto& n3 = names[k];
+                if (ump.find(n3) == ump.end()) continue;
+                const auto& v3 = ump[n3];
+                for (int m = k + 1; m < sz; ++m) {
+                    const auto& n4 = names[m];
+                    if (ump.find(n4) == ump.end()) continue;
+                    const auto& v4 = ump[n4];
+                    for (int n = m + 1; n < sz; ++n) {
+                        const auto& n5 = names[n];
+                        if (ump.find(n5) == ump.end()) continue;
+                        const auto& v5 = ump[n5];
+                        string key = m_breed + "|" + n1 + "|" + v1 + "|" + n2 + "|" + v2 + "|" + n3 + "|" + v3 + "|" +
+                                     n4 + "|" + n5 + "|" + v5;
+                        vector<pair<string, string>> vt{{n1, v1}, {n2, v2}, {n3, v3}, {n4, v4}, {n5, v5}};
+                        m_propoty.push_back(new Propoty(vt, key));
+                        // m_propoty.push_back(new Propoty(key));
+                    }
                 }
             }
         }

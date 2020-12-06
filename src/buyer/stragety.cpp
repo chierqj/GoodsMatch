@@ -15,45 +15,36 @@
 #include "src/comm/tools.h"
 #include "src/seller/seller.h"
 
-int res_count1 = 0;
-int res_count2 = 0;
+// int factor[6] = {1, 2, 5, 15, 30};
+int factor[6] = {1, 2, 2, 20, 40};  // 157.00999451000
 
-Depot* choice_best_depot(BGoods* buyer, const string& first_expect) {
+Depot* choice_best_depot_step1(BGoods* buyer) {
     auto Seller = Seller::GetInstance();
     auto& sellers_groupby_depot = Seller->GetSellers();
 
     int max_value = 0;
-    int max_sum_value = 0;
-    string s1, s2;
+    string max_depot_id;
 
     for (auto& [depot_id, depot] : sellers_groupby_depot) {
-        int stock = depot->sellers_tol_stock[first_expect];
-        if (stock == 0) continue;
-        if (stock > max_value) {
-            max_value = stock;
-            s1 = depot_id;
-        }
+        if (depot->sellers_tol_stock[buyer->GetFirstIntent()] == 0) continue;
 
-        int tmp = 0;
+        int val = 0;
         for (auto& it : buyer->GetPermuIntents()) {
             if (it->orders[0] != 0) continue;
-            string key = it->map_key;
-            int cnt = depot->sellers_tol_stock[key];
-            tmp += cnt;
+            val += depot->sellers_tol_stock[it->map_key] * factor[(it->values).size()];
         }
-        if (tmp > max_sum_value) {
-            max_sum_value = tmp;
-            s2 = depot_id;
+        if (val > max_value) {
+            max_value = val;
+            max_depot_id = depot_id;
         }
     }
 
     if (max_value == 0) return nullptr;
-
-    Depot* result = max_value < buyer->GetBuyCount() ? sellers_groupby_depot[s1] : sellers_groupby_depot[s2];
+    Depot* result = max_value == 0 ? nullptr : sellers_groupby_depot[max_depot_id];
     return result;
 }
 
-Depot* choice_best_depot(const BGoods* buyer) {
+Depot* choice_best_depot_step2(const BGoods* buyer) {
     auto Seller = Seller::GetInstance();
     auto& sellers_groupby_depot = Seller->GetSellers();
 
@@ -64,7 +55,7 @@ Depot* choice_best_depot(const BGoods* buyer) {
         int val = 0;
         for (auto& intent : buyer->GetPermuIntents()) {
             if (intent->orders[0] == 0) continue;
-            val += depot->sellers_tol_stock[intent->map_key];
+            val += depot->sellers_tol_stock[intent->map_key] * factor[(intent->values).size()];
         }
         if (val > max_value) {
             max_value = val;
@@ -100,6 +91,7 @@ BGoods* Buyer::get_best_buyer() {
         }
     }
     if (!ok) return nullptr;
+
     auto result = m_buyers_groupby_expect[min_intent].front();
     m_buyers_groupby_expect[min_intent].pop_front();
     return result;
@@ -109,18 +101,14 @@ void Buyer::assign_buyer(BGoods* buyer, bool consider_first_intent) {
     struct seller_node {
         Intent* expecter;
         int stock;
-        bool operator<(const seller_node& r) const {
-            // return expecter->score * stock < r.expecter->score * r.stock;
-            return expecter->score < r.expecter->score;
-        }
+        bool operator<(const seller_node& r) const { return expecter->score < r.expecter->score; }
     };
 
     auto& global_count = Seller::GetInstance()->GetGlobalCount();
 
     while (buyer->GetBuyCount() > 0) {
         // [step1] 选一个最优的仓库
-        auto depot =
-            (consider_first_intent ? choice_best_depot(buyer, buyer->GetFirstIntent()) : choice_best_depot(buyer));
+        auto depot = (consider_first_intent ? choice_best_depot_step1(buyer) : choice_best_depot_step2(buyer));
 
         if (depot == nullptr) break;
 
@@ -159,38 +147,34 @@ void Buyer::assign_buyer(BGoods* buyer, bool consider_first_intent) {
 }
 
 void Buyer::assign_step1() {
+    // int idx = 0;
+    // while (true) {
+    //     if (++idx % 10000 == 0) log_debug("* idx: %d", idx);
+
+    //     auto buyer = this->get_best_buyer();
+    //     if (buyer == nullptr) break;
+
+    //     this->assign_buyer(buyer, true);
+
+    //     if (buyer->GetBuyCount() > 0) {
+    //         m_left_buyers.push_back(buyer);
+    //     }
+    // }
+
     int idx = 0;
-    while (true) {
-        if (++idx % 10000 == 0) log_debug("* idx: %d", idx);
+    for (auto& intent : m_range_order) {
+        for (auto& buyer : m_buyers_groupby_expect[intent]) {
+            if (++idx % 10000 == 0) log_debug("* idx: %d", idx);
 
-        auto buyer = this->get_best_buyer();
-        if (buyer == nullptr) break;
+            if (buyer == nullptr) break;
 
-        this->assign_buyer(buyer, true);
+            this->assign_buyer(buyer, true);
 
-        if (buyer->GetBuyCount() > 0) {
-            m_left_buyers.push_back(buyer);
+            if (buyer->GetBuyCount() > 0) {
+                m_left_buyers.push_back(buyer);
+            }
         }
     }
-}
-
-int choice_best_depot(const BGoods* buyer, string& best_depot_id) {
-    auto Seller = Seller::GetInstance();
-    auto& sellers_groupby_depot = Seller->GetSellers();
-
-    int max_value = 0;
-    for (auto& [depot_id, depot] : sellers_groupby_depot) {
-        int val = 0;
-        for (auto& intent : buyer->GetPermuIntents()) {
-            if (intent->orders[0] == 0) continue;
-            val += depot->sellers_tol_stock[intent->map_key];
-        }
-        if (val > max_value) {
-            max_value = val;
-            best_depot_id = depot_id;
-        }
-    }
-    return max_value == 0 ? -1 : 0;
 }
 
 void Buyer::assign_step2() {
@@ -207,8 +191,11 @@ void Buyer::assign_step2() {
     };
 
     m_sort();
+    int idx = 0;
 
     while (!tmp_buyers.empty()) {
+        if (++idx % 10000 == 0) log_debug("* idx: %d", idx);
+
         auto& buyer = tmp_buyers.front();
         tmp_buyers.pop_front();
 

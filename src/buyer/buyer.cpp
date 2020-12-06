@@ -161,12 +161,14 @@ void Buyer::pretreat() {
         m_buyers_groupby_expect[buyer->GetFirstIntent()].push_back(buyer);
     }
 
-    auto& global_count = Seller::GetInstance()->GetGlobalCount();
-
     // sort by hold_time
     int max_expext_buyers = 0;
     int min_expext_buyers = INT_MAX;
     int tol_expext_buyers = 0;
+
+    vector<pair<int, string>> intent_order;
+    auto& global_count = Seller::GetInstance()->GetGlobalCount();
+
     for (auto& [expect, buyers] : m_buyers_groupby_expect) {
         sort(buyers.begin(), buyers.end(), [&](const BGoods* g1, const BGoods* g2) {
             if (g1->GetHoldTime() == g2->GetHoldTime()) {
@@ -174,10 +176,34 @@ void Buyer::pretreat() {
             }
             return g1->GetHoldTime() > g2->GetHoldTime();
         });
+
+        int count = 0, tol_count = global_count[expect];
+        for (auto& it : buyers) {
+            count += it->GetBuyCount();
+        }
+        intent_order.push_back({count, expect});
         max_expext_buyers = max(max_expext_buyers, (int)buyers.size());
         min_expext_buyers = min(min_expext_buyers, (int)buyers.size());
         tol_expext_buyers += (int)buyers.size();
     }
+
+    sort(intent_order.begin(), intent_order.end(),
+         [&](const pair<int, string>& p1, const pair<int, string>& p2) { return p1.first > p2.first; });
+    for (auto& [count, intent] : intent_order) m_range_order.push_back(intent);
+
+    // auto& global_count = Seller::GetInstance()->GetGlobalCount();
+    // for (auto& [expect, buyers] : m_buyers_groupby_expect) {
+    //     int tol_count = global_count[expect];
+    //     int select_index = -1, count = 0;
+    //     for (int i = 0; i < buyers.size(); ++i) {
+    //         count += buyers[i]->GetBuyCount();
+    //         if (count > tol_count) break;
+    //         select_index = i;
+    //     }
+    //     if (select_index == -1) continue;
+    //     sort(buyers.begin(), buyers.begin() + select_index + 1,
+    //          [&](const BGoods* g1, const BGoods* g2) { return g1->GetBuyCount() > g2->GetBuyCount(); });
+    // }
 
     log_info("* expect_count: %d", m_buyers_groupby_expect.size());
     log_info("* max_expext_buyers: %d", max_expext_buyers);

@@ -51,6 +51,7 @@ class Buyer {
     vector<Business> m_results;                                      // 成交
     vector<BGoods *> m_buyers_no_expects;                            // no_expects
     deque<BGoods *> m_left_buyers;                                   // 剩余未分配
+    vector<string> m_range_order;                                    // buyer遍历顺序
 };
 
 #endif /* !BUYER_H_ */
