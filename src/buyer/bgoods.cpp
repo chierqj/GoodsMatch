@@ -26,9 +26,12 @@ void BGoods::create_permutation() {
     bool sign = true;
     m_useful_intent = 0;
 
-    m_first_intent = "";
-    if (!m_intent[0].first.empty()) {
-        m_first_intent = m_breed + "|" + m_intent[0].first + "|" + m_intent[0].second;
+    m_intent_map_key = vector<string>(m_intent.size(), "");
+    for (int i = 0; i < m_intent.size(); i++) {
+        if (!m_intent[i].first.empty()) {
+            string key = m_breed + "|" + m_intent[i].first + "|" + m_intent[i].second;
+            m_intent_map_key[i] = key;
+        }
     }
 
     // 一个一个

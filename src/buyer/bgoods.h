@@ -52,9 +52,9 @@ class BGoods {
     inline const string& GetBreed() const;
     inline const vector<pair<string, string>>& GetIntents() const;
     inline void SetBuyCount(int buy_count);
-    inline const vector<Intent*>& GetPermuIntents() const;
+    inline vector<Intent*>& GetPermuIntents();
     inline const int& GetUsefulIntent() const;
-    inline const string& GetFirstIntent() const;
+    inline const vector<string>& GetIntentMapKeys() const;
 
    private:
     string m_buyer_id;                      // 买家id
@@ -64,7 +64,7 @@ class BGoods {
     vector<pair<string, string>> m_intent;  // 五个意向
     vector<Intent*> m_permu_intents;        // 27种
     int m_useful_intent;                    // 有效意向
-    string m_first_intent;                  // 第一意向
+    vector<string> m_intent_map_key;        // 第一意向
 };
 
 inline const string& BGoods::GetBuyerID() const { return m_buyer_id; }
@@ -73,8 +73,8 @@ inline const int& BGoods::GetBuyCount() const { return m_buy_count; }
 inline const string& BGoods::GetBreed() const { return m_breed; }
 inline const vector<pair<string, string>>& BGoods::GetIntents() const { return m_intent; }
 inline void BGoods::SetBuyCount(int buy_count) { m_buy_count = buy_count; }
-inline const vector<Intent*>& BGoods::GetPermuIntents() const { return m_permu_intents; }
+inline vector<Intent*>& BGoods::GetPermuIntents() { return m_permu_intents; }
 inline const int& BGoods::GetUsefulIntent() const { return m_useful_intent; }
-inline const string& BGoods::GetFirstIntent() const { return m_first_intent; }
+inline const vector<string>& BGoods::GetIntentMapKeys() const { return m_intent_map_key; }
 
 #endif /* !BGOODS_H_ */
