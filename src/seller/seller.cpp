@@ -19,7 +19,11 @@ Seller* Seller::GetInstance() {
 void Seller::debug() {
     log_info("----------------------------------------------");
     log_info("* 货物总数: %d", m_goods.size());
-    log_info("* depot_count: %d", m_sellers_groupby_depot.size());
+    log_info("* 仓库总数: %d", m_depots.size());
+    for (int i = 0; i < m_depots.size(); ++i) {
+        log_info("* [第%d个仓库] [CF: %d, SR: %d]", i, m_depots[i]->sellers["CF"].size(),
+                 m_depots[i]->sellers["SR"].size());
+    }
     log_info("----------------------------------------------");
 }
 
@@ -28,7 +32,6 @@ void Seller::Execute() {
     log_info("* Seller 初始化");
 
     this->read_data();
-    this->sort_goods();
     this->create_hashmap();
     this->debug();
 
@@ -53,7 +56,7 @@ void Seller::read_data() {
         assert(row_data.size() == 10);
         auto good = new SGoods(row_data[0], row_data[1], row_data[2], atoi(row_data[3].c_str()), row_data[4],
                                row_data[5], row_data[6], row_data[7], row_data[8], row_data[9]);
-        good->create_permutation();
+        this->create_permutation(good);
         m_goods.push_back(good);
     }
     fin.close();
@@ -61,33 +64,171 @@ void Seller::read_data() {
     log_info("* [load %s] [line: %d] [%.3fs]", file_path.c_str(), m_goods.size(), t.LogTime());
 }
 
-void Seller::sort_goods() {
-    sort(m_goods.begin(), m_goods.end(),
-         [&](const SGoods* g1, const SGoods* g2) { return g1->GetGoodStock() < g2->GetGoodStock(); });
-}
-
 void Seller::create_hashmap() {
     ScopeTime t;
 
-    vector<string> names{"仓库", "品牌", "产地", "年度", "等级", "类别"};
-    sort(names.begin(), names.end());
+    sort(m_goods.begin(), m_goods.end(),
+         [&](const SGoods* g1, const SGoods* g2) { return g1->GetGoodStock() > g2->GetGoodStock(); });
+
+    unordered_map<string, Depot*> ump_depot;  // depot_id -> depot;
+    unordered_map<string, unordered_map<string, unordered_map<string, deque<SGoods*>>>> ump_sellers;
+    unordered_map<string, unordered_map<string, unordered_map<string, int>>> ump_count;  // depot,breed,goodid
 
     for (const auto& seller : m_goods) {
-        m_sellers_groupby_depot[seller->GetDepotID()] = new Depot(seller->GetDepotID());
+        const auto& breed = seller->GetBreed();
+        const auto& depot_id = seller->GetDepotID();
+        const auto& good_id = seller->GetGoodID();
+        ump_depot[depot_id] = new Depot(depot_id);
+        ump_sellers[depot_id][breed][good_id].push_back(seller);
+        ump_count[depot_id][breed][good_id] += seller->GetGoodStock();
     }
 
-    for (const auto& seller : m_goods) {
-        auto& depot = m_sellers_groupby_depot[seller->GetDepotID()];
-
-        for (const auto& propoty : seller->GetPropoty()) {
-            string key = propoty->map_key;
-            depot->sellers_groupby_except[key].push_back(seller);
-            depot->sellers_tol_stock[key] += seller->GetGoodStock();
-            m_global_count[propoty->map_key] += seller->GetGoodStock();
+    for (auto& [depot_id, depot] : ump_depot) {
+        for (auto& [breed, sellers_gr] : ump_sellers[depot_id]) {
+            for (auto& [good_id, sellers] : sellers_gr) {
+                int tol = ump_count[depot_id][breed][good_id];
+                depot->sellers[breed].push_back(Depot::Item{0, tol, good_id, sellers});
+            }
         }
-
-        depot->useful_sellers[seller->GetBreed()].insert(seller);
+        m_depots.push_back(depot);
     }
 
     log_info("* [create hashmap] [%.3fs]", t.LogTime());
+}
+
+void Seller::create_permutation(SGoods* seller) {
+    const auto& good_id = seller->GetGoodID();
+    const auto& depot_id = seller->GetDepotID();
+    const auto& brand = seller->GetBrand();
+    const auto& price = seller->GetPlace();
+    const auto& year = seller->GetYear();
+    const auto& level = seller->GetLevel();
+    const auto& category = seller->GetCategory();
+    const auto& breed = seller->GetBreed();
+    const auto& stock = seller->GetGoodStock();
+
+    if (!depot_id.empty()) m_global_count[breed + "|仓库|" + depot_id] += stock;
+    if (!brand.empty()) m_global_count[breed + "|品牌|" + brand] += stock;
+    if (!price.empty()) m_global_count[breed + "|产地|" + price] += stock;
+    if (!year.empty()) m_global_count[breed + "|年度|" + year] += stock;
+    if (!level.empty()) m_global_count[breed + "|等级|" + level] += stock;
+    if (!category.empty()) m_global_count[breed + "|类别|" + category] += stock;
+
+    if (m_propoty.find(good_id) != m_propoty.end()) return;
+
+    static const vector<string> names{"产地", "仓库", "品牌", "年度", "等级", "类别"};
+    unordered_map<string, string> ump;
+    if (!depot_id.empty()) ump["仓库"] = depot_id;
+    if (!brand.empty()) ump["品牌"] = brand;
+    if (!price.empty()) ump["产地"] = price;
+    if (!year.empty()) ump["年度"] = year;
+    if (!level.empty()) ump["等级"] = level;
+    if (!category.empty()) ump["类别"] = category;
+
+    int sz = names.size();
+    // 一个一个
+    for (auto& name : names) {
+        if (ump.find(name) == ump.end()) {
+            continue;
+        }
+        string key = breed + "|" + name + "|" + ump[name];
+        m_propoty[good_id].push_back(new Propoty({{name, ump[name]}}, key));
+    }
+
+    // // 两个两个
+    // for (int i = 0; i < sz; ++i) {
+    //     const auto& n1 = names[i];
+    //     if (ump.find(n1) == ump.end()) continue;
+    //     const auto& v1 = ump[n1];
+    //     for (int j = i + 1; j < sz; ++j) {
+    //         const auto& n2 = names[j];
+    //         if (ump.find(n2) == ump.end()) continue;
+    //         const auto& v2 = ump[n2];
+    //         string key = breed + "|" + n1 + "|" + v1 + "|" + n2 + "|" + v2;
+    //         vector<pair<string, string>> vt{{n1, v1}, {n2, v2}};
+    //         m_propoty[good_id].push_back(new Propoty(vt, key));
+    //         // m_propoty[good_id].push_back(new Propoty(key));
+    //     }
+    // }
+
+    // // 三个三个
+    // for (int i = 0; i < sz; ++i) {
+    //     const auto& n1 = names[i];
+    //     if (ump.find(n1) == ump.end()) continue;
+    //     const auto& v1 = ump[n1];
+    //     for (int j = i + 1; j < sz; ++j) {
+    //         const auto& n2 = names[j];
+    //         if (ump.find(n2) == ump.end()) continue;
+    //         const auto& v2 = ump[n2];
+    //         for (int k = j + 1; k < sz; ++k) {
+    //             const auto& n3 = names[k];
+    //             if (ump.find(n3) == ump.end()) continue;
+    //             const auto& v3 = ump[n3];
+    //             string key = breed + "|" + n1 + "|" + v1 + "|" + n2 + "|" + v2 + "|" + n3 + "|" + v3;
+    //             vector<pair<string, string>> vt{{n1, v1}, {n2, v2}, {n3, v3}};
+    //             m_propoty[good_id].push_back(new Propoty(vt, key));
+    //             // m_propoty[good_id].push_back(new Propoty(key));
+    //         }
+    //     }
+    // }
+
+    // // 四个四个
+    // for (int i = 0; i < sz; ++i) {
+    //     const auto& n1 = names[i];
+    //     if (ump.find(n1) == ump.end()) continue;
+    //     const auto& v1 = ump[n1];
+    //     for (int j = i + 1; j < sz; ++j) {
+    //         const auto& n2 = names[j];
+    //         if (ump.find(n2) == ump.end()) continue;
+    //         const auto& v2 = ump[n2];
+    //         for (int k = j + 1; k < sz; ++k) {
+    //             const auto& n3 = names[k];
+    //             if (ump.find(n3) == ump.end()) continue;
+    //             const auto& v3 = ump[n3];
+    //             for (int m = k + 1; m < sz; ++m) {
+    //                 const auto& n4 = names[m];
+    //                 if (ump.find(n4) == ump.end()) continue;
+    //                 const auto& v4 = ump[n4];
+    //                 string key =
+    //                     breed + "|" + n1 + "|" + v1 + "|" + n2 + "|" + v2 + "|" + n3 + "|" + v3 + "|" + n4 + "|" +
+    //                     v4;
+    //                 vector<pair<string, string>> vt{{n1, v1}, {n2, v2}, {n3, v3}, {n4, v4}};
+    //                 m_propoty[good_id].push_back(new Propoty(vt, key));
+    //                 // m_propoty[good_id].push_back(new Propoty(key));
+    //             }
+    //         }
+    //     }
+    // }
+
+    // // 五个五个
+    // for (int i = 0; i < sz; ++i) {
+    //     const auto& n1 = names[i];
+    //     if (ump.find(n1) == ump.end()) continue;
+    //     const auto& v1 = ump[n1];
+    //     for (int j = i + 1; j < sz; ++j) {
+    //         const auto& n2 = names[j];
+    //         if (ump.find(n2) == ump.end()) continue;
+    //         const auto& v2 = ump[n2];
+    //         for (int k = j + 1; k < sz; ++k) {
+    //             const auto& n3 = names[k];
+    //             if (ump.find(n3) == ump.end()) continue;
+    //             const auto& v3 = ump[n3];
+    //             for (int m = k + 1; m < sz; ++m) {
+    //                 const auto& n4 = names[m];
+    //                 if (ump.find(n4) == ump.end()) continue;
+    //                 const auto& v4 = ump[n4];
+    //                 for (int n = m + 1; n < sz; ++n) {
+    //                     const auto& n5 = names[n];
+    //                     if (ump.find(n5) == ump.end()) continue;
+    //                     const auto& v5 = ump[n5];
+    //                     string key = breed + "|" + n1 + "|" + v1 + "|" + n2 + "|" + v2 + "|" + n3 + "|" + v3 + "|" +
+    //                                  n4 + "|" + n5 + "|" + v5;
+    //                     vector<pair<string, string>> vt{{n1, v1}, {n2, v2}, {n3, v3}, {n4, v4}, {n5, v5}};
+    //                     m_propoty[good_id].push_back(new Propoty(vt, key));
+    //                     // m_propoty[good_id].push_back(new Propoty(key));
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 }

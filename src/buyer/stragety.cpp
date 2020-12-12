@@ -5,6 +5,7 @@
 #include <fstream>
 #include <map>
 #include <queue>
+#include <random>
 #include <set>
 
 #include "buyer.h"
@@ -18,204 +19,153 @@
 // int factor[6] = {1, 2, 2, 20, 40};  // 157.00999451000
 // int factor[6] = {0, 1, 2, 10, 20, 40};  // 157.048
 // int factor[6] = {0, 1, 2, 10, 30, 40};  // 157.14999390
-// int factor[6] = {0, 1, 1, 10, 50, 90};  // 本地:157.153 线上: 157.19000244000
-int factor[6] = {0, 1, 1, 10, 50, 90};  // 本地:157.153 线上: 157.19000244000
+// int factor[6] = {0, 1, 1, 10, 50, 90};  // 本地:157.153 线上: 157.19000244
+// int factor[6] = {0, 1, 1, 10, 300, 1000};  // 本地:157.173 线上: 157.21000671
+int factor[6] = {0, 1, 1, 10, 300, 1000};  // 本地:157.173 线上: 157.19000244000
+int cf_score[5] = {33, 27, 20, 13, 7};
+int sr_score[5] = {40, 30, 20, 10, 0};
 
-Depot* choice_best_depot_step1(BGoods* buyer) {
-    auto Seller = Seller::GetInstance();
-    auto& sellers_groupby_depot = Seller->GetSellers();
+int Buyer::get_depot_score(Depot* depot, BGoods* buyer, bool consider_first_intent) {
+    auto& items = depot->sellers[buyer->GetBreed()];
+    depot->pop_front(buyer);
 
-    int max_value = 0;
-    string max_depot_id;
+    bool ok = false;
+    for (auto& item : items) {
+        item.score = 0;
+        item.pop_front();
+        if (item.values.empty()) continue;
 
-    const auto& first_intent = buyer->GetIntentMapKeys()[0];
-    for (auto& [depot_id, depot] : sellers_groupby_depot) {
-        int stock = depot->sellers_tol_stock[first_intent];
-        if (stock == 0) continue;
+        // 意向打分
+        auto intent_order = this->get_intent_order(item.values.front(), buyer);
+        if (consider_first_intent && (intent_order.empty() || intent_order[0] != 0)) continue;
 
-        int val = 0;
-        for (auto& it : buyer->GetPermuIntents()) {
-            if (it->orders[0] != 0) continue;
-            val += depot->sellers_tol_stock[it->map_key] * factor[(it->values).size()];
+        ok = true;
+        int intent_score = 0;
+        for (auto& it : intent_order) {
+            intent_score += (buyer->GetBreed() == "CF" ? cf_score[it] : sr_score[it]);
         }
-        if (val > max_value) {
-            max_value = val;
-            max_depot_id = depot_id;
-        }
+        item.score = intent_score * factor[intent_order.size()];
     }
 
-    if (max_value == 0) return nullptr;
-    Depot* result = max_value == 0 ? nullptr : sellers_groupby_depot[max_depot_id];
+    if (!ok) return 0;
+
+    sort(items.begin(), items.end(), [&](const auto& it1, const auto& it2) {
+        if (it1.score == it2.score) {
+            return it1.tol_stock > it2.tol_stock;
+        }
+        return it1.score > it2.score;
+    });
+    int result = 0, tol = 0;
+    for (auto& item : items) {
+        if (tol >= buyer->GetBuyCount()) break;
+        int count = min(buyer->GetBuyCount() - tol, item.tol_stock);
+        result += count * item.score;
+        tol += count;
+    }
     return result;
 }
 
-Depot* choice_best_depot_step2(BGoods* buyer) {
+void Buyer::do_business(Depot::Item& item, BGoods* buyer, SGoods* seller) {
     auto Seller = Seller::GetInstance();
-    auto& sellers_groupby_depot = Seller->GetSellers();
+    auto& global_count = Seller->GetGloalCount();
 
-    int max_value = 0;
-    string best_depot_id;
+    int val = min(buyer->GetBuyCount(), seller->GetGoodStock());
+    buyer->SetBuyCount(buyer->GetBuyCount() - val);
+    seller->SetGoodStock(seller->GetGoodStock() - val);
+    item.tol_stock -= val;
 
-    for (auto& [depot_id, depot] : sellers_groupby_depot) {
-        int val = 0;
-        for (auto& intent : buyer->GetPermuIntents()) {
-            val += depot->sellers_tol_stock[intent->map_key] * factor[(intent->values).size()];
-        }
-        if (val > max_value) {
-            max_value = val;
-            best_depot_id = depot_id;
-        }
+    for (auto& it : Seller->GetPropotys()[seller->GetGoodID()]) {
+        global_count[it->map_key] -= val;
     }
 
-    Depot* result = max_value == 0 ? nullptr : sellers_groupby_depot[best_depot_id];
-    return result;
+    Business bus(buyer, seller, val, this->get_intent_order(seller, buyer));
+    m_results.push_back(bus);
 }
-
-// void Buyer::assign_buyer(BGoods* buyer, bool consider_first_intent) {
-//     struct seller_node {
-//         Intent* expecter;
-//         int stock;
-//         bool operator<(const seller_node& r) const { return expecter->score < r.expecter->score; }
-//     };
-
-//     auto& global_count = Seller::GetInstance()->GetGlobalCount();
-
-//     while (buyer->GetBuyCount() > 0) {
-//         // [step1] 选一个最优的仓库
-//         auto depot = (consider_first_intent ? choice_best_depot_step1(buyer) : choice_best_depot_step2(buyer));
-
-//         if (depot == nullptr) break;
-
-//         // [step3] 枚举27种意向，丢到pq里面
-//         priority_queue<seller_node> pq_sellers;
-//         for (const auto& expecter : buyer->GetPermuIntents()) {
-//             // 必须考虑第一意向的情况下
-//             if (consider_first_intent && expecter->orders[0] != 0) continue;
-//             depot->pop_front(buyer->GetBreed(), expecter->map_key);
-//             if (depot->sellers_groupby_except[expecter->map_key].empty()) continue;
-
-//             sort(depot->sellers_groupby_except[expecter->map_key].begin(),
-//                  depot->sellers_groupby_except[expecter->map_key].end(),
-//                  [&](const SGoods* g1, const SGoods* g2) { return g1->GetGoodStock() > g2->GetGoodStock(); });
-//             pq_sellers.push({expecter});
-//         }
-
-//         // log_debug("* debug1");
-//         while (buyer->GetBuyCount() > 0 && !pq_sellers.empty()) {
-//             auto head = pq_sellers.top();
-//             pq_sellers.pop();
-
-//             auto& seller = depot->sellers_groupby_except[head.expecter->map_key].front();
-
-//             int val = min(buyer->GetBuyCount(), seller->GetGoodStock());
-
-//             buyer->SetBuyCount(buyer->GetBuyCount() - val);
-//             seller->SetGoodStock(seller->GetGoodStock() - val);
-//             depot->decrease_stock(seller, val, global_count);
-
-//             Business bus(buyer, seller, val, head.expecter->orders);
-//             m_results.push_back(bus);
-
-//             depot->pop_front(buyer->GetBreed(), head.expecter->map_key);
-//             if (depot->sellers_groupby_except[head.expecter->map_key].empty()) continue;
-
-//             pq_sellers.push(head);
-//         }
-//     }
-// }
 
 void Buyer::assign_buyer(BGoods* buyer, bool consider_first_intent) {
-    auto& global_count = Seller::GetInstance()->GetGlobalCount();
+    auto Seller = Seller::GetInstance();
+    auto& global_count = Seller->GetGloalCount();
+    if (consider_first_intent && global_count[buyer->GetIntentMapKeys()[0]] <= 0) return;
 
     while (buyer->GetBuyCount() > 0) {
-        // [step1] 选一个最优的仓库
-        auto depot = (consider_first_intent ? choice_best_depot_step1(buyer) : choice_best_depot_step2(buyer));
+        int select_score = 0;
+        Depot* select_depot = nullptr;
 
-        if (depot == nullptr) break;
-
-        auto& permu_intenters = buyer->GetPermuIntents();
-        sort(permu_intenters.begin(), permu_intenters.end(), [&](const Intent* g1, const Intent* g2) {
-            int count1 = depot->sellers_tol_stock[g1->map_key], count2 = depot->sellers_tol_stock[g2->map_key];
-            if (g1->score == g2->score) {
-                return count1 > count2;
+        // [step1] 选一个仓库
+        for (auto& depot : Seller->GetDepots()) {
+            int score = get_depot_score(depot, buyer, consider_first_intent);
+            if (score > select_score) {
+                select_score = score;
+                select_depot = depot;
             }
-            return g1->score > g2->score;
-        });
+        }
+        if (select_depot == nullptr) {
+            break;
+        }
 
-        // [step2] 得分从大到小枚举意向组合
-        for (auto& intenter : permu_intenters) {
-            if (buyer->GetBuyCount() <= 0) break;
+        // log_debug("----------- 选择仓库买之前 -----------");
 
-            // 必须考虑第一意向的情况下
-            if (consider_first_intent && intenter->orders[0] != 0) continue;
+        // [step2] 按照品种选sellers. groupby_goodid
+        select_depot->pop_front(buyer);
+        auto& items = select_depot->sellers[buyer->GetBreed()];
 
-            depot->pop_front(buyer->GetBreed(), intenter->map_key);
-            auto& sellers = depot->sellers_groupby_except[intenter->map_key];
-            if (sellers.empty()) continue;
+        // [step3] 货物编号的score降序
+        while (buyer->GetBuyCount() > 0 && !items.empty()) {
+            auto& item = items.front();
+            item.pop_front();
 
-            sort(sellers.begin(), sellers.end(),
-                 [&](const SGoods* g1, const SGoods* g2) { return g1->GetGoodStock() > g2->GetGoodStock(); });
-
-            while (buyer->GetBuyCount() > 0 && !sellers.empty()) {
-                auto& seller = sellers.front();
-
-                int val = min(buyer->GetBuyCount(), seller->GetGoodStock());
-
-                buyer->SetBuyCount(buyer->GetBuyCount() - val);
-                seller->SetGoodStock(seller->GetGoodStock() - val);
-                depot->decrease_stock(seller, val, global_count);
-
-                Business bus(buyer, seller, val, intenter->orders);
-                m_results.push_back(bus);
-
-                depot->pop_front(buyer->GetBreed(), intenter->map_key);
+            // [step4] 当前货物编号挨个选
+            while (buyer->GetBuyCount() > 0 && !item.values.empty()) {
+                auto& seller = item.values.front();
+                this->do_business(item, buyer, seller);
+                item.pop_front();
             }
+
+            select_depot->pop_front(buyer);
         }
     }
 }
 
 void Buyer::assign_last_buyers() {
+    vector<BGoods*> last_buyers;
     for (auto& buyer : m_goods) {
         if (buyer->GetBuyCount() > 0) {
-            m_buyers_no_expects.push_back(buyer);
+            last_buyers.push_back(buyer);
         }
     }
-    sort(m_buyers_no_expects.begin(), m_buyers_no_expects.end(),
+    sort(last_buyers.begin(), last_buyers.end(),
          [&](const BGoods* g1, const BGoods* g2) { return g1->GetBuyCount() > g2->GetBuyCount(); });
 
-    log_debug("第 last 轮, 买家总数: %d", m_buyers_no_expects.size());
+    log_debug("第 last 轮, 买家总数: %d", last_buyers.size());
 
     auto Seller = Seller::GetInstance();
-    auto& sellers_groupby_depot = Seller->GetSellers();
-    auto& global_count = Seller->GetGlobalCount();
 
-    for (auto& buyer : m_buyers_no_expects) {
-        for (auto& [depot_id, depot] : sellers_groupby_depot) {
-            if (buyer->GetBuyCount() <= 0) break;
+    int idx = 0;
+    for (auto& buyer : last_buyers) {
+        if (++idx % 1 == 0) log_debug("* idx: %d", idx);
+        for (auto& depot : Seller->GetDepots()) {
+            depot->pop_front(buyer);
+            auto& items = depot->sellers[buyer->GetBreed()];
 
-            while (buyer->GetBuyCount() > 0 && !depot->useful_sellers[buyer->GetBreed()].empty()) {
-                auto& seller = *depot->useful_sellers[buyer->GetBreed()].begin();
-                int val = min(buyer->GetBuyCount(), seller->GetGoodStock());
-
-                buyer->SetBuyCount(buyer->GetBuyCount() - val);
-                seller->SetGoodStock(seller->GetGoodStock() - val);
-                depot->decrease_stock(seller, val, global_count);
-
-                Business bus(buyer, seller, val, {0});
-                m_results.push_back(bus);
-
-                if (seller->GetGoodStock() <= 0) {
-                    depot->useful_sellers[buyer->GetBreed()].erase(seller);
+            while (buyer->GetBuyCount() > 0 && !items.empty()) {
+                auto& item = items.front();
+                item.pop_front();
+                while (buyer->GetBuyCount() > 0 && !item.values.empty()) {
+                    auto& seller = item.values.front();
+                    this->do_business(item, buyer, seller);
+                    item.pop_front();
                 }
+
+                depot->pop_front(buyer);
             }
         }
     }
 }
 
-vector<vector<BGoods*>> Buyer::create_buyers(int intent_id, int& buyers_count) {
+vector<queue<BGoods*>> Buyer::create_buyers(int intent_id, int& buyers_count) {
     unordered_map<string, vector<BGoods*>> ump;
     unordered_map<string, int> ump_count;
-    auto& global_count = Seller::GetInstance()->GetGlobalCount();
+
     for (const auto& buyer : m_goods) {
         if (buyer->GetBuyCount() <= 0 || buyer->GetIntentMapKeys()[intent_id].empty()) {
             continue;
@@ -231,7 +181,7 @@ vector<vector<BGoods*>> Buyer::create_buyers(int intent_id, int& buyers_count) {
     sort(vt.begin(), vt.end(),
          [&](const pair<int, string>& p1, const pair<int, string>& p2) { return p1.first > p2.first; });
 
-    vector<vector<BGoods*>> ans;
+    vector<queue<BGoods*>> ans;
     buyers_count = 0;
     for (auto& it : vt) {
         auto buyers = ump[it.second];
@@ -248,23 +198,56 @@ vector<vector<BGoods*>> Buyer::create_buyers(int intent_id, int& buyers_count) {
         }
 
         buyers_count += buyers.size();
-        ans.push_back(buyers);
+        queue<BGoods*> tmp;
+        for (auto& it : buyers) tmp.push(it);
+        ans.push_back(tmp);
     }
 
     return ans;
 }
 
 void Buyer::assign_goods() {
-    for (int i = 0; i < 5; ++i) {
+    auto Seller = Seller::GetInstance();
+    auto& global_count = Seller->GetGloalCount();
+
+    for (int intent_id = 0; intent_id < 5; ++intent_id) {
         int buyers_count = 0;
-        auto vct_buyers = create_buyers(i, buyers_count);
-        log_debug("第 %d 轮, 意向数: %d, 买家总数: %d", i, vct_buyers.size(), buyers_count);
+        auto buyers_gr = create_buyers(intent_id, buyers_count);
+
+        log_debug("第 %d 轮, 意向数: %d, 买家总数: %d", intent_id, buyers_gr.size(), buyers_count);
         int idx = 0;
-        for (auto& buyers : vct_buyers) {
-            for (auto& buyer : buyers) {
-                if (++idx % 10000 == 0) log_debug("* idx: %d", idx);
-                this->assign_buyer(buyer, (i == 0));
+
+        // for (auto& buyers : buyers_gr) {
+        //     while (!buyers.empty()) {
+        //         if (++idx % 1000 == 0) log_debug("* idx: %d", idx);
+        //         auto& buyer = buyers.front();
+        //         buyers.pop();
+        //         this->assign_buyer(buyer, (intent_id == 0));
+        //     }
+        // }
+
+        while (true) {
+            if (++idx % 1000 == 0) log_debug("* idx: %d", idx);
+
+            int select_idx = -1;
+            double select_value = INT_MAX;
+            for (int i = 0; i < buyers_gr.size(); ++i) {
+                const auto& buyers = buyers_gr[i];
+                if (buyers.empty()) continue;
+                const auto& buyer = buyers.front();
+                double val = (double)(global_count[buyer->GetIntentMapKeys()[intent_id]] * 1.0);
+                val /= (double)(buyer->GetBuyCount() * 1.0);
+                if (select_idx == -1 || val < select_value) {
+                    select_idx = i;
+                    select_value = val;
+                }
             }
+            if (select_idx == -1) break;
+
+            auto& buyer = buyers_gr[select_idx].front();
+            buyers_gr[select_idx].pop();
+
+            this->assign_buyer(buyer, (intent_id == 0));
         }
     }
     this->assign_last_buyers();
