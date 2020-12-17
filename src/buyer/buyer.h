@@ -27,22 +27,32 @@ class Buyer {
     void debug();
 
    private:
+    void pop_depot(deque<Depot::Item *> &items) {
+        while (!items.empty()) {
+            items.front()->pop_front();
+            if (items.front()->values.empty()) {
+                items.pop_front();
+            } else {
+                break;
+            }
+        }
+    }
     Buyer() {}
     Buyer(const Buyer &) = delete;
     Buyer &operator=(const Buyer &) = delete;
 
     void read_data();
-    void create_match_intent();
     vector<int> get_intent_order(SGoods *seller, BGoods *buyer);
     void output();
     void contact_result();
 
-    void do_business(Depot::Item &item, BGoods *buyer, SGoods *seller);
-    void assign_buyer(BGoods *buyer, bool consider_first_intent);
+    void do_business(Depot *depot, Depot::Item *item, BGoods *buyer, SGoods *seller);
+    void assign_buyer(BGoods *buyer, int intent_id);
     void assign_last_buyers();
-    vector<queue<BGoods *>> create_buyers(int intent_id, int &buyers_count);
+    vector<pair<string, deque<BGoods *>>> create_buyers(int intent_id, int &buyers_count,
+                                                        unordered_map<string, int> &ump_count);
     void assign_goods();
-    int get_depot_score(Depot *depot, BGoods *buyer, bool consider_first_intent);
+    void assign_special(BGoods *buyer, int intent_id);
 
    private:
     static Buyer *Instance;                             // 单例

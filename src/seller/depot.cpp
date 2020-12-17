@@ -2,27 +2,12 @@
 
 #include "src/comm/log.h"
 
-void Depot::pop_front(BGoods* buyer) {
-    auto& items = sellers[buyer->GetBreed()];
-    while (!items.empty()) {
-        items.front().pop_front();
-        if (items.front().values.empty()) {
-            items.pop_front();
-        } else {
-            break;
-        }
-    }
-}
-
 void Depot::debug() {
+    log_debug("---------------------------------------------------------------");
     log_debug("* 仓库id: %s", depot_id.c_str());
     log_debug("* 货物种类: cf: %d, sr: %d, tol: %d", sellers["CF"].size(), sellers["SR"].size(),
               sellers["SR"].size() + sellers["CF"].size());
-    for (auto& [breed, items] : sellers) {
-        for (int i = 0; i < items.size(); ++i) {
-            const auto& item = items[i];
-            log_debug("* [%s, %d] [score: %d, tol_stock: %d, good_id: %s", breed.c_str(), i, item.score, item.tol_stock,
-                      item.good_id.c_str());
-        }
+    for (auto& [intent, items] : map_sellers) {
+        log_debug("* [意向: %s] [货物种类数: %d] [总库存: %d]", intent.c_str(), items.size(), map_stock[intent]);
     }
 }

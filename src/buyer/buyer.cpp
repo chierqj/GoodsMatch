@@ -28,12 +28,11 @@ void Buyer::Execute() {
     log_info("* Buyer 开始运行");
     ScopeTime t;
 
-    this->read_data();            // 加载数据
-    this->create_match_intent();  // 构造意向order
-    this->assign_goods();         // 分配货物
-    this->contact_result();       // 合并结果
-    this->output();               // 输出结果
-    this->debug();                // 打印输出
+    this->read_data();       // 加载数据
+    this->assign_goods();    // 分配货物
+    this->contact_result();  // 合并结果
+    this->output();          // 输出结果
+    this->debug();           // 打印输出
 
     log_info("* Buyer::Execute(): %.3fs", t.LogTime());
     log_info("----------------------------------------------");
@@ -148,9 +147,6 @@ void Buyer::contact_result() {
 }
 
 vector<int> Buyer::get_intent_order(SGoods* seller, BGoods* buyer) {
-    // string key = seller->GetGoodID() + "|" + buyer->GetBuyerID() + "|" + buyer->GetBreed();
-    // return m_match_intent[key];
-
     const auto& depot_id = seller->GetDepotID();
     const auto& brand = seller->GetBrand();
     const auto& place = seller->GetPlace();
@@ -170,46 +166,4 @@ vector<int> Buyer::get_intent_order(SGoods* seller, BGoods* buyer) {
         if (k == "类别" && v == category) ans.push_back(i);
     }
     return ans;
-}
-
-void Buyer::create_match_intent() {
-    return;
-
-    log_info("----------------------------------------------");
-    log_info("* 构造意向顺序");
-    ScopeTime t;
-
-    auto Seller = Seller::GetInstance();
-    for (auto& buyer : m_goods) {
-        for (auto& depot : Seller->GetDepots()) {
-            for (auto& [breed, items] : depot->sellers) {
-                for (auto& item : items) {
-                    const auto& seller = item.values.front();
-                    const auto& depot_id = seller->GetDepotID();
-                    const auto& brand = seller->GetBrand();
-                    const auto& place = seller->GetPlace();
-                    const auto& year = seller->GetYear();
-                    const auto& level = seller->GetLevel();
-                    const auto& category = seller->GetCategory();
-
-                    vector<int> ans;
-                    for (int i = 0; i < buyer->GetIntents().size(); i++) {
-                        const auto& [k, v] = buyer->GetIntents()[i];
-                        if (k == "仓库" && v == depot_id) ans.push_back(i);
-                        if (k == "品牌" && v == brand) ans.push_back(i);
-                        if (k == "产地" && v == place) ans.push_back(i);
-                        if (k == "年度" && v == year) ans.push_back(i);
-                        if (k == "等级" && v == level) ans.push_back(i);
-                        if (k == "类别" && v == category) ans.push_back(i);
-                    }
-
-                    string key = item.good_id + "|" + buyer->GetBuyerID() + "|" + buyer->GetBreed();
-                    m_match_intent[key] = ans;
-                }
-            }
-        }
-    }
-
-    log_info("* [time: %.3fs]", t.LogTime());
-    log_info("----------------------------------------------");
 }

@@ -80,5 +80,6 @@
         "stdexcept": "cpp",
         "streambuf": "cpp",
         "tuple": "cpp"
-    }
+    },
+    "python.pythonPath": "/usr/bin/python3"
 }

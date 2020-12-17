@@ -329,10 +329,17 @@ double Judger::GetScore() {
         buyerBreed_score[item->GetBuyerId() + item->GetBreed()] += ((double)curNum / allNum) * score;
     }
     unordered_map<string, double> buyerBreed_hopeScore;
+
+    auto file_path = Config::g_conf["score_file"];
+    ofstream fout(file_path);
+    fout << "买方客户,得分\n";
     for (auto &item : buyerBreed_score) {
         item.second = item.second * hopeScore_weight;
         buyerBreed_hopeScore[item.first] = item.second;
+        fout << item.first << "," << item.second << "\n";
     }
+    fout.close();
+
     //统计diary_score
     unordered_map<string, unordered_set<string>> buyerBreed_depotID;
     for (auto &item : m_records) {
