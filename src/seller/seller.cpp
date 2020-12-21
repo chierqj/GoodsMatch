@@ -3,6 +3,7 @@
 #include <cassert>
 #include <fstream>
 
+#include "good_item.h"
 #include "src/comm/config.h"
 #include "src/comm/log.h"
 #include "src/comm/scope_time.h"
@@ -19,11 +20,7 @@ Seller* Seller::GetInstance() {
 void Seller::debug() {
     log_info("----------------------------------------------");
     log_info("* 货物总数: %d", m_goods.size());
-    log_info("* 仓库总数: %d", m_depots.size());
-    // for (auto& depot : m_depots) {
-    //     depot->debug();
-    // }
-
+    log_info("* 意向总数: %d", m_good_items.size());
     log_info("----------------------------------------------");
 }
 
@@ -70,7 +67,7 @@ void Seller::create_hashmap() {
     sort(m_goods.begin(), m_goods.end(),
          [&](const SGoods* g1, const SGoods* g2) { return g1->GetGoodStock() > g2->GetGoodStock(); });
 
-    unordered_map<string, Depot*> ump_depot;  // depot_id -> depot;
+    unordered_map<string, int> ump_depot;  // depot_id -> depot;
     unordered_map<string, unordered_map<string, unordered_map<string, deque<SGoods*>>>> ump_sellers;
     unordered_map<string, unordered_map<string, unordered_map<string, int>>> ump_count;  // depot,breed,goodid
 
@@ -78,7 +75,7 @@ void Seller::create_hashmap() {
         const auto& breed = seller->GetBreed();
         const auto& depot_id = seller->GetDepotID();
         const auto& good_id = seller->GetGoodID();
-        ump_depot[depot_id] = new Depot(depot_id);
+        ump_depot[depot_id] = 1;
         ump_sellers[depot_id][breed][good_id].push_back(seller);
         ump_count[depot_id][breed][good_id] += seller->GetGoodStock();
     }
@@ -87,16 +84,13 @@ void Seller::create_hashmap() {
         for (auto& [breed, sellers_gr] : ump_sellers[depot_id]) {
             for (auto& [good_id, sellers] : sellers_gr) {
                 int tol = ump_count[depot_id][breed][good_id];
-                auto item = new Depot::Item{0, tol, good_id, sellers};
-                depot->sellers[breed].push_back(item);
+                auto item = new GoodItem(0, tol, good_id, sellers);
                 for (auto& it : m_propoty[good_id]) {
-                    depot->map_sellers[it->map_key].push_back(item);
-                    depot->map_stock[it->map_key] += tol;
+                    if (it->values.size() == 1) m_good_items[it->map_key].push_back(item);
                     m_global_count[it->map_key] += tol;
                 }
             }
         }
-        m_depots.push_back(depot);
     }
 
     log_info("* [create hashmap] [%.3fs]", t.LogTime());
@@ -112,13 +106,6 @@ void Seller::create_permutation(SGoods* seller) {
     const auto& category = seller->GetCategory();
     const auto& breed = seller->GetBreed();
     const auto& stock = seller->GetGoodStock();
-
-    // if (!depot_id.empty()) m_global_count[breed + "|仓库|" + depot_id] += stock;
-    // if (!brand.empty()) m_global_count[breed + "|品牌|" + brand] += stock;
-    // if (!price.empty()) m_global_count[breed + "|产地|" + price] += stock;
-    // if (!year.empty()) m_global_count[breed + "|年度|" + year] += stock;
-    // if (!level.empty()) m_global_count[breed + "|等级|" + level] += stock;
-    // if (!category.empty()) m_global_count[breed + "|类别|" + category] += stock;
 
     if (m_propoty.find(good_id) != m_propoty.end()) return;
 
@@ -154,7 +141,6 @@ void Seller::create_permutation(SGoods* seller) {
             string key = breed + "|" + n1 + "|" + v1 + "|" + n2 + "|" + v2;
             vector<pair<string, string>> vt{{n1, v1}, {n2, v2}};
             m_propoty[good_id].push_back(new Propoty(vt, key));
-            // m_propoty[good_id].push_back(new Propoty(key));
         }
     }
 
@@ -174,7 +160,6 @@ void Seller::create_permutation(SGoods* seller) {
                 string key = breed + "|" + n1 + "|" + v1 + "|" + n2 + "|" + v2 + "|" + n3 + "|" + v3;
                 vector<pair<string, string>> vt{{n1, v1}, {n2, v2}, {n3, v3}};
                 m_propoty[good_id].push_back(new Propoty(vt, key));
-                // m_propoty[good_id].push_back(new Propoty(key));
             }
         }
     }
@@ -200,7 +185,6 @@ void Seller::create_permutation(SGoods* seller) {
                         breed + "|" + n1 + "|" + v1 + "|" + n2 + "|" + v2 + "|" + n3 + "|" + v3 + "|" + n4 + "|" + v4;
                     vector<pair<string, string>> vt{{n1, v1}, {n2, v2}, {n3, v3}, {n4, v4}};
                     m_propoty[good_id].push_back(new Propoty(vt, key));
-                    // m_propoty[good_id].push_back(new Propoty(key));
                 }
             }
         }
@@ -231,7 +215,6 @@ void Seller::create_permutation(SGoods* seller) {
                                      n4 + "|" + n5 + "|" + v5;
                         vector<pair<string, string>> vt{{n1, v1}, {n2, v2}, {n3, v3}, {n4, v4}, {n5, v5}};
                         m_propoty[good_id].push_back(new Propoty(vt, key));
-                        // m_propoty[good_id].push_back(new Propoty(key));
                     }
                 }
             }

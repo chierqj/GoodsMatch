@@ -22,7 +22,7 @@ void Judger::Execute() {
     this->CheckIntent();
 
     auto score = GetScore();
-    log_info("* 得分: %.3f ", score);
+    log_info("* 得分: %f ", score);
 }
 
 void Judger::CheckStock() {
@@ -410,8 +410,10 @@ double Judger::GetScore() {
         log_debug("* 仓库个数: %d, 客户数: %d ", item.first, item.second);
     }
 
-    log_debug("* [CF] --- [hope_score: %f, diary_score: %f]", cf_hopeScore, cf_diaryScore);
-    log_debug("* [SR] --- [hope_score: %f, diary_score: %f]", sr_hopeScore, sr_diaryScore);
+    log_debug("* [CF] --- [hope_score: %f, diary_score: %f, tol: %f]", cf_hopeScore, cf_diaryScore,
+              cf_hopeScore + cf_diaryScore);
+    log_debug("* [SR] --- [hope_score: %f, diary_score: %f, tol: %f]", sr_hopeScore, sr_diaryScore,
+              sr_hopeScore + sr_diaryScore);
     log_debug("* [ALL]--- [hope_score: %f, diary_score: %f]", cf_hopeScore + sr_hopeScore,
               cf_diaryScore + sr_diaryScore);
 

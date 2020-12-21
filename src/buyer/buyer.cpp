@@ -92,6 +92,12 @@ void Buyer::read_data() {
 
         auto good = new BGoods(row_data[0], atoi(row_data[1].c_str()), atoi(row_data[2].c_str()), row_data[3], excepts);
         good->create_permutation();
+
+        m_gloabl_buy_count.resize(good->GetIntentMapKeys().size());
+        for (int i = 0; i < good->GetIntentMapKeys().size(); ++i) {
+            const auto& intent = good->GetIntentMapKeys()[i];
+            m_gloabl_buy_count[i][intent] += good->GetBuyCount();
+        }
         m_goods.push_back(good);
     }
     fin.close();
@@ -164,6 +170,32 @@ vector<int> Buyer::get_intent_order(SGoods* seller, BGoods* buyer) {
         if (k == "年度" && v == year) ans.push_back(i);
         if (k == "等级" && v == level) ans.push_back(i);
         if (k == "类别" && v == category) ans.push_back(i);
+    }
+    return ans;
+}
+
+int Buyer::get_intent_score(SGoods* seller, BGoods* buyer) {
+    const auto& depot_id = seller->GetDepotID();
+    const auto& brand = seller->GetBrand();
+    const auto& place = seller->GetPlace();
+    const auto& year = seller->GetYear();
+    const auto& level = seller->GetLevel();
+    const auto& category = seller->GetCategory();
+
+    static const vector<int> cf_score{33, 27, 20, 13, 7};
+    static const vector<int> sr_score{40, 30, 20, 10, 0};
+
+    int ans = 0;
+    for (int i = 0; i < buyer->GetIntents().size(); i++) {
+        const auto& [k, v] = buyer->GetIntents()[i];
+        if (v.empty()) continue;
+        int value = buyer->GetBreed() == "CF" ? cf_score[i] : sr_score[i];
+        if (k == "仓库" && v == depot_id) ans += value;
+        if (k == "品牌" && v == brand) ans += value;
+        if (k == "产地" && v == place) ans += value;
+        if (k == "年度" && v == year) ans += value;
+        if (k == "等级" && v == level) ans += value;
+        if (k == "类别" && v == category) ans += value;
     }
     return ans;
 }

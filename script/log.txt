@@ -1,0 +1,7 @@
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /Users/chier/Desktop/GoodsMatch/build
+Scanning dependencies of target GoodsMatch
+[  6%] Building CXX object CMakeFiles/GoodsMatch.dir/src/buyer/stragety.cpp.o
+[ 12%] Linking CXX executable ../bin/GoodsMatch
+[100%] Built target GoodsMatch

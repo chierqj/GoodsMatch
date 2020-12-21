@@ -16,7 +16,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include "depot.h"
+#include "good_item.h"
 #include "sgoods.h"
 #include "src/buyer/bgoods.h"
 using namespace std;
@@ -35,9 +35,9 @@ class Seller {
    public:
     void Execute();
     void debug();
-    inline vector<Depot*>& GetDepots();
     inline unordered_map<string, int>& GetGloalCount();
     inline unordered_map<string, vector<Propoty*>>& GetPropotys();
+    inline unordered_map<string, deque<GoodItem*>>& GetGoodItems();
 
    private:
     Seller() {}
@@ -49,14 +49,14 @@ class Seller {
     void create_permutation(SGoods* seller);
 
    private:
-    static Seller* Instance;                            // 单例
-    vector<SGoods*> m_goods;                            // 总货物
-    vector<Depot*> m_depots;                            // 全部的seller
-    unordered_map<string, vector<Propoty*>> m_propoty;  // good_id -> 属性组合
-    unordered_map<string, int> m_global_count;          // 单属性[breed+value]
+    static Seller* Instance;                               // 单例
+    vector<SGoods*> m_goods;                               // 总货物
+    unordered_map<string, vector<Propoty*>> m_propoty;     // good_id -> 属性组合
+    unordered_map<string, int> m_global_count;             // 单属性[breed+value]
+    unordered_map<string, deque<GoodItem*>> m_good_items;  // 多属性意向
 };
-inline vector<Depot*>& Seller::GetDepots() { return m_depots; }
 inline unordered_map<string, int>& Seller::GetGloalCount() { return m_global_count; }
 inline unordered_map<string, vector<Propoty*>>& Seller::GetPropotys() { return m_propoty; }
+inline unordered_map<string, deque<GoodItem*>>& Seller::GetGoodItems() { return m_good_items; }
 
 #endif /* !SELLER_H_ */
