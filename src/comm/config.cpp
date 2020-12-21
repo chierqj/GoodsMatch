@@ -8,6 +8,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <cassert>
 
 #include "debug.h"
 #include "log.h"

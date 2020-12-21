@@ -9,6 +9,7 @@
 
 #define DEBUG(...) cerr << "[" << #__VA_ARGS__ << "]:", debug_out(__VA_ARGS__)
 
+#include <cassert>
 #include <iostream>
 using std::cerr;
 using std::pair;

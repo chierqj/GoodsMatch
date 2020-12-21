@@ -11,7 +11,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <vector>
-
+#include <algorithm>
 #include "src/comm/log.h"
 
 using namespace std;
