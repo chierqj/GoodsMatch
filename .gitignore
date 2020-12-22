@@ -36,3 +36,8 @@ resource/result.txt
 log/*
 build/*
 bin/*
+
+data/code/GoodsMatch/resource/*.txt
+data/code/GoodsMatch/log/*
+data/code/GoodsMatch/build/*
+data/code/GoodsMatch/bin/*
